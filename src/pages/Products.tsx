@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PRODUCT_CATEGORIES, type Product } from '../types/product'
 import { listPublicProducts, type SearchFilters } from '../services/productService'
-import { createRequest } from '../services/requestService'
+import { ensureConversationWith, sendMessage } from '../services/messagingService'
 import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -118,8 +118,9 @@ function useDebouncedValue<T>(value: T, delay = 300) {
 function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, userLng?: number }){
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [msgText, setMsgText] = useState('Hola. ¿Sigue estando disponible?')
+  const [sendingMsg, setSendingMsg] = useState(false)
+  const [msgSent, setMsgSent] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [added, setAdded] = useState(false)
   const firstImage = p.image_urls?.[0]
@@ -128,18 +129,21 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     if (userLat==null || userLng==null || p.lat==null || p.lng==null) return null
     return haversineKm(userLat, userLng, p.lat, p.lng)
   }, [userLat, userLng, p.lat, p.lng])
-  async function sendRequest(){
+  async function sendMarketplaceMessage(){
     setErr(null)
-    if (!user) { navigate(`/login?intent=request&next=/products`); return }
-    if (isOwner) { setErr('No puedes enviarte una solicitud a ti mismo.'); return }
-    setSending(true)
+    if (!user) { navigate(`/login?intent=message&next=/products`); return }
+    if (isOwner) { setErr('Este es tu producto.'); return }
+    const text = msgText.trim()
+    if (!text) { setErr('Escribe un mensaje.'); return }
+    setSendingMsg(true)
     try {
-      await createRequest({ buyerId: user.id, producerId: p.user_id, productId: p.id, message: `Estoy interesado en ${p.name}. ¿Podemos coordinar precio y entrega?` })
-      setSent(true)
+      const conv = await ensureConversationWith(user.id, p.user_id)
+      await sendMessage(conv.id, user.id, text)
+      setMsgSent(true)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'No se pudo enviar la solicitud'
-      setErr(msg)
-    } finally { setSending(false) }
+      const m = e instanceof Error ? e.message : 'No fue posible enviar el mensaje'
+      setErr(m)
+    } finally { setSendingMsg(false) }
   }
   function onAddToCart(){
     addToCart({ id: p.id, name: p.name, price: p.price, image_url: p.image_urls?.[0], seller_id: p.user_id }, 1)
@@ -167,14 +171,29 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       </div>
       {isOwner && <p className="mt-2 text-xs text-gray-500">Este es tu producto.</p>}
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
-      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <button disabled={sending || sent || isOwner} onClick={sendRequest} className="w-full rounded-md border border-green-600 px-3 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
-          {sent ? 'Solicitud enviada' : (sending ? 'Enviando…' : 'Enviar solicitud')}
-        </button>
-        <button disabled={isOwner} onClick={onAddToCart} className="w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
-          {added ? 'Agregado ✓' : 'Agregar al carrito'}
-        </button>
+      <div className="mt-3 rounded-lg border border-gray-300 bg-gray-900 text-gray-100">
+        <div className="border-b border-gray-700 px-3 py-2 text-sm font-medium">Envía un mensaje al vendedor</div>
+        <div className="p-3">
+          <textarea
+            value={msgText}
+            onChange={(e)=> setMsgText(e.target.value)}
+            rows={2}
+            className="w-full resize-none rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500"
+            placeholder="Hola. ¿Sigue estando disponible?"
+            disabled={isOwner}
+          />
+          <button
+            onClick={sendMarketplaceMessage}
+            disabled={isOwner || sendingMsg || msgSent}
+            className="mt-3 w-full rounded-md bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {msgSent ? 'Enviado' : (sendingMsg ? 'Enviando…' : 'Enviar')}
+          </button>
+        </div>
       </div>
+      <button disabled={isOwner} onClick={onAddToCart} className="mt-2 w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
+        {added ? 'Agregado ✓' : 'Agregar al carrito'}
+      </button>
     </div>
   )
 }
