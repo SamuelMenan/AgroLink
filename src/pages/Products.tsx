@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PRODUCT_CATEGORIES, type Product } from '../types/product'
 import { listPublicProducts, type SearchFilters } from '../services/productService'
 import { createRequest } from '../services/requestService'
+import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
@@ -120,6 +121,7 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [added, setAdded] = useState(false)
   const firstImage = p.image_urls?.[0]
   const isOwner = user?.id === p.user_id
   const distanceKm = useMemo(()=>{
@@ -138,6 +140,11 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       const msg = e instanceof Error ? e.message : 'No se pudo enviar la solicitud'
       setErr(msg)
     } finally { setSending(false) }
+  }
+  function onAddToCart(){
+    addToCart({ id: p.id, name: p.name, price: p.price, image_url: p.image_urls?.[0], seller_id: p.user_id }, 1)
+    setAdded(true)
+    setTimeout(()=> setAdded(false), 1200)
   }
   return (
     <div className="overflow-hidden rounded-xl border border-green-100 bg-white p-4 shadow-sm">
@@ -160,9 +167,14 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       </div>
       {isOwner && <p className="mt-2 text-xs text-gray-500">Este es tu producto.</p>}
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
-      <button disabled={sending || sent || isOwner} onClick={sendRequest} className="mt-3 w-full rounded-md border border-green-600 px-3 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
-        {sent ? 'Solicitud enviada' : (sending ? 'Enviando…' : 'Enviar solicitud')}
-      </button>
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <button disabled={sending || sent || isOwner} onClick={sendRequest} className="w-full rounded-md border border-green-600 px-3 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
+          {sent ? 'Solicitud enviada' : (sending ? 'Enviando…' : 'Enviar solicitud')}
+        </button>
+        <button disabled={isOwner} onClick={onAddToCart} className="w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
+          {added ? 'Agregado ✓' : 'Agregar al carrito'}
+        </button>
+      </div>
     </div>
   )
 }

@@ -2,12 +2,21 @@ import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import appLogo from '../assets/logo.png'
 import NotificationsBell from './NotificationsBell'
+import { getCartCount, onCartChange } from '../services/cartService'
+import { useEffect, useState } from 'react'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-green-600 text-white' : 'text-gray-700 hover:bg-green-50 hover:text-green-700'}`
 
 export default function Navbar() {
   const { user, signOut } = useAuth()
+  const [cartCount, setCartCount] = useState<number>(() => getCartCount())
+  useEffect(()=>{
+    const off = onCartChange(()=> setCartCount(getCartCount()))
+    // también actualizar al montar (por si cambió en otra vista)
+    setCartCount(getCartCount())
+    return off
+  }, [])
   const initials = (user?.full_name || user?.email || '')
     .split(' ')
     .map((s) => s[0])
@@ -35,8 +44,11 @@ export default function Navbar() {
               <NavLink to="/dashboard" className={navItemClass}>
                 Panel
               </NavLink>
-              <NavLink to="/cart" className={navItemClass}>
+              <NavLink to="/cart" className={(args)=> navItemClass(args) + ' relative'}>
                 Carrito
+                {cartCount > 0 && (
+                  <span className="absolute -right-2 -top-2 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{cartCount}</span>
+                )}
               </NavLink>
             </nav>
           </div>
