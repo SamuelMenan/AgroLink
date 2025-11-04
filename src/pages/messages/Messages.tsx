@@ -171,7 +171,7 @@ export default function Messages(){
             <div className="mx-auto max-w-md rounded-xl border bg-white p-6 text-center text-gray-700">
               <span className="material-icons-outlined mx-auto mb-2 block text-4xl text-green-700">chat</span>
               <div className="text-lg font-semibold">Aún no tienes mensajes</div>
-              <div className="mt-1 text-sm">Cuando alguien te escriba, lo verás aquí. Puedes empezar desde “Solicitudes”.</div>
+              <div className="mt-1 text-sm">Cuando alguien te escriba, lo verás aquí. Puedes empezar desde la página de productos enviando un mensaje al vendedor.</div>
             </div>
           )}
 

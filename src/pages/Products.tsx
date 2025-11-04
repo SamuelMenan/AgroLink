@@ -182,13 +182,23 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
             placeholder="Hola. ¿Sigue estando disponible?"
             disabled={isOwner}
           />
-          <button
-            onClick={sendMarketplaceMessage}
-            disabled={isOwner || sendingMsg || msgSent}
-            className="mt-3 w-full rounded-md bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {msgSent ? 'Enviado' : (sendingMsg ? 'Enviando…' : 'Enviar')}
-          </button>
+          {msgSent ? (
+            <a
+              href={`/messages?with=${encodeURIComponent(p.user_id)}`}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+            >
+              <span className="material-icons-outlined text-[18px]">chat</span>
+              Abrir chat
+            </a>
+          ) : (
+            <button
+              onClick={sendMarketplaceMessage}
+              disabled={isOwner || sendingMsg}
+              className="mt-3 w-full rounded-md bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {sendingMsg ? 'Enviando…' : 'Enviar'}
+            </button>
+          )}
         </div>
       </div>
       <button disabled={isOwner} onClick={onAddToCart} className="mt-2 w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
