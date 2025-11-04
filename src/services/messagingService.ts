@@ -32,9 +32,11 @@ export async function ensureConversationWith(userId: string, otherUserId: string
     return (await supabase.from(TABLE_CONV).select('*').eq('id', common).single()).data as Conversation
   }
   // Create new conversation and add both participants
-  const { data: conv, error: e1 } = await supabase.from(TABLE_CONV).insert({}).select('*').single()
+  // Important: avoid returning representation here to bypass SELECT RLS before the user is a participant
+  const newId = uuidv4()
+  const { error: e1 } = await supabase.from(TABLE_CONV).insert({ id: newId })
   if (e1) throw new Error(e1.message)
-  const cid = (conv as Conversation).id
+  const cid = newId
   // Insert participants sequentially to satisfy RLS policies
   const { error: e2a } = await supabase.from(TABLE_PARTICIPANTS).insert({ conversation_id: cid, user_id: userId })
   if (e2a) throw new Error(e2a.message)
@@ -47,7 +49,7 @@ export async function ensureConversationWith(userId: string, otherUserId: string
     const b64 = await exportKeyBase64(key)
     storeKey(cid, b64)
   }
-  return conv as Conversation
+  return { id: cid, created_at: new Date().toISOString() }
 }
 
 export async function listConversations(userId: string): Promise<Conversation[]> {

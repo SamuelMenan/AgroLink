@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PRODUCT_CATEGORIES, type Product } from '../types/product'
-import { listPublicProducts, type SearchFilters } from '../services/productService'
+import { listPublicProducts, type SearchFilters, deleteProduct } from '../services/productService'
 import { ensureConversationWith, sendMessage } from '../services/messagingService'
 import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 export default function Products() {
   const [q, setQ] = useState('')
@@ -123,12 +123,14 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
   const [msgSent, setMsgSent] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [added, setAdded] = useState(false)
+  const [removed, setRemoved] = useState(false)
   const firstImage = p.image_urls?.[0]
   const isOwner = user?.id === p.user_id
   const distanceKm = useMemo(()=>{
     if (userLat==null || userLng==null || p.lat==null || p.lng==null) return null
     return haversineKm(userLat, userLng, p.lat, p.lng)
   }, [userLat, userLng, p.lat, p.lng])
+  if (removed) return null
   async function sendMarketplaceMessage(){
     setErr(null)
     if (!user) { navigate(`/login?intent=message&next=/products`); return }
@@ -169,41 +171,72 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
           <span>{distanceKm.toFixed(1)} km</span>
         )}
       </div>
-      {isOwner && <p className="mt-2 text-xs text-gray-500">Este es tu producto.</p>}
-      {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
-      <div className="mt-3 rounded-lg border border-gray-300 bg-gray-900 text-gray-100">
-        <div className="border-b border-gray-700 px-3 py-2 text-sm font-medium">Envía un mensaje al vendedor</div>
-        <div className="p-3">
-          <textarea
-            value={msgText}
-            onChange={(e)=> setMsgText(e.target.value)}
-            rows={2}
-            className="w-full resize-none rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 placeholder-gray-400 outline-none focus:border-blue-500"
-            placeholder="Hola. ¿Sigue estando disponible?"
-            disabled={isOwner}
-          />
-          {msgSent ? (
-            <a
-              href={`/messages?with=${encodeURIComponent(p.user_id)}`}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-            >
-              <span className="material-icons-outlined text-[18px]">chat</span>
-              Abrir chat
-            </a>
-          ) : (
+      {isOwner ? (
+        <div className="mt-3 rounded-xl border border-green-200 bg-white p-3">
+          <p className="text-sm text-gray-600">Este es tu producto.</p>
+          <div className="mt-3 flex gap-2">
+            <Link to={`/dashboard/products/${p.id}/edit`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-600 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">
+              <span className="material-icons-outlined text-[18px]">edit</span>
+              Editar
+            </Link>
             <button
-              onClick={sendMarketplaceMessage}
-              disabled={isOwner || sendingMsg}
-              className="mt-3 w-full rounded-md bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              onClick={async ()=>{
+                const ok = window.confirm('¿Eliminar este producto? Esta acción no se puede deshacer.')
+                if (!ok) return
+                try {
+                  await deleteProduct(p.id)
+                  setRemoved(true)
+                } catch (e) {
+                  const m = e instanceof Error ? e.message : 'No se pudo eliminar'
+                  setErr(m)
+                }
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-600 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
             >
-              {sendingMsg ? 'Enviando…' : 'Enviar'}
+              <span className="material-icons-outlined text-[18px]">delete</span>
+              Eliminar
             </button>
-          )}
+          </div>
+          {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
         </div>
-      </div>
-      <button disabled={isOwner} onClick={onAddToCart} className="mt-2 w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60">
-        {added ? 'Agregado ✓' : 'Agregar al carrito'}
-      </button>
+      ) : (
+        <>
+          {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
+          <div className="mt-3 rounded-xl border border-green-200 bg-white">
+            <div className="border-b border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-900">Envía un mensaje al vendedor</div>
+            <div className="p-3">
+              <textarea
+                value={msgText}
+                onChange={(e)=> setMsgText(e.target.value)}
+                rows={2}
+                className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+                placeholder="Hola. ¿Sigue estando disponible?"
+              />
+              {msgSent ? (
+                <a
+                  href={`/messages?with=${encodeURIComponent(p.user_id)}`}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                >
+                  <span className="material-icons-outlined text-[18px]">chat</span>
+                  Abrir chat
+                </a>
+              ) : (
+                <button
+                  onClick={sendMarketplaceMessage}
+                  disabled={sendingMsg}
+                  className="mt-3 w-full rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {sendingMsg ? 'Enviando…' : 'Enviar'}
+                </button>
+              )}
+            </div>
+          </div>
+          <button onClick={onAddToCart} className="mt-2 w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white">
+            {added ? 'Agregado ✓' : 'Agregar al carrito'}
+          </button>
+        </>
+      )}
     </div>
   )
 }
