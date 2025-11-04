@@ -35,8 +35,11 @@ export async function ensureConversationWith(userId: string, otherUserId: string
   const { data: conv, error: e1 } = await supabase.from(TABLE_CONV).insert({}).select('*').single()
   if (e1) throw new Error(e1.message)
   const cid = (conv as Conversation).id
-  const { error: e2 } = await supabase.from(TABLE_PARTICIPANTS).insert([{ conversation_id: cid, user_id: userId }, { conversation_id: cid, user_id: otherUserId }])
-  if (e2) throw new Error(e2.message)
+  // Insert participants sequentially to satisfy RLS policies
+  const { error: e2a } = await supabase.from(TABLE_PARTICIPANTS).insert({ conversation_id: cid, user_id: userId })
+  if (e2a) throw new Error(e2a.message)
+  const { error: e2b } = await supabase.from(TABLE_PARTICIPANTS).insert({ conversation_id: cid, user_id: otherUserId })
+  if (e2b) throw new Error(e2b.message)
   // Generate and store a conversation key locally (demo E2EE)
   const existing = getStoredKey(cid)
   if (!existing) {
