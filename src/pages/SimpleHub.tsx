@@ -12,7 +12,7 @@ export default function SimpleHub() {
         <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Habla con tus compradores" />
         <BigButton to="/dashboard/products/new" icon="add_circle" title="Publicar producto" subtitle="Publica fácil y rápido" />
         <BigButton to="/dashboard/products" icon="inventory_2" title="Mis publicaciones" subtitle="Edita o elimina" />
-        <BigButton to="/dashboard/requests/incoming" icon="inbox" title="Solicitudes" subtitle="Acepta o rechaza" />
+  <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Habla directo, sin solicitudes" />
         <BigButton to="/dashboard/notifications" icon="notifications" title="Notificaciones" subtitle="Novedades y avisos" />
       </section>
 

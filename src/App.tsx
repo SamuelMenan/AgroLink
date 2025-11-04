@@ -13,9 +13,7 @@ import NotFound from './pages/NotFound'
 import PublishProduct from './pages/products/PublishProduct'
 import MyProducts from './pages/products/MyProducts'
 import EditProduct from './pages/products/EditProduct'
-import RealtimeNotifications from './components/RealtimeNotifications'
-import MyRequests from './pages/requests/MyRequests'
-import IncomingRequests from './pages/requests/IncomingRequests'
+// import RealtimeNotifications from './components/RealtimeNotifications'
 import NotificationsPage from './pages/notifications/NotificationsPage'
 import Messages from './pages/messages/Messages'
 import SimpleHub from './pages/SimpleHub'
@@ -24,7 +22,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
       <Navbar />
-      <RealtimeNotifications />
+  {/* RealtimeNotifications removido: ya no hay flujo de solicitudes */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
@@ -37,8 +35,7 @@ function App() {
           <Route path="/dashboard/products" element={<MyProducts />} />
           <Route path="/dashboard/products/new" element={<PublishProduct />} />
           <Route path="/dashboard/products/:id/edit" element={<EditProduct />} />
-          <Route path="/dashboard/requests/outgoing" element={<MyRequests />} />
-          <Route path="/dashboard/requests/incoming" element={<IncomingRequests />} />
+          {/* Rutas de solicitudes eliminadas. Usar Mensajes en su lugar. */}
           <Route path="/dashboard/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<Messages />} />
         </Route>

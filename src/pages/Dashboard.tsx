@@ -17,13 +17,9 @@ export default function Dashboard() {
           <h2 className="font-semibold">Mis publicaciones</h2>
           <p className="text-sm text-gray-600">Edita o elimina tus publicaciones.</p>
         </a>
-        <a href="/dashboard/requests/incoming" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-          <h2 className="font-semibold">Solicitudes recibidas</h2>
-          <p className="text-sm text-gray-600">Acepta o rechaza solicitudes comerciales.</p>
-        </a>
-        <a href="/dashboard/requests/outgoing" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-          <h2 className="font-semibold">Mis solicitudes</h2>
-          <p className="text-sm text-gray-600">Historial y estado de solicitudes enviadas.</p>
+        <a href="/messages" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
+          <h2 className="font-semibold">Mensajes</h2>
+          <p className="text-sm text-gray-600">Chatea directamente con compradores y vendedores.</p>
         </a>
         <div className="md:col-span-3">
           <MessagesWidget />
