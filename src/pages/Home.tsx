@@ -1,4 +1,11 @@
+import { Link, Navigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+
 export default function Home() {
+  const { user } = useAuth()
+  const sellTo = user ? '/dashboard/products/new' : '/login?intent=publish&next=/dashboard/products/new'
+  // Si el usuario ya está autenticado, lo llevamos al panel principal SIMPLE
+  if (user) return <Navigate to="/simple" replace />
   return (
     <main>
       {/* Hero */}
@@ -10,8 +17,8 @@ export default function Home() {
             mejorar ingresos y ofrecer productos frescos y justos.
           </p>
           <div className="mt-8 flex gap-3">
-            <a href="/products" className="inline-flex items-center rounded-md bg-green-600 px-5 py-2.5 text-white shadow hover:bg-green-700">Explorar productos</a>
-            <a href="/register" className="inline-flex items-center rounded-md border border-green-600 px-5 py-2.5 text-green-700 hover:bg-green-600 hover:text-white">Vender en AgroLink</a>
+            <Link to="/products" className="inline-flex items-center rounded-md bg-green-600 px-5 py-2.5 text-white shadow hover:bg-green-700">Explorar productos</Link>
+            <Link to={sellTo} className="inline-flex items-center rounded-md border border-green-600 px-5 py-2.5 text-green-700 hover:bg-green-600 hover:text-white">Vender en AgroLink</Link>
           </div>
         </div>
       </section>

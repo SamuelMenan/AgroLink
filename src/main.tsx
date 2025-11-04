@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { BrowserRouter } from 'react-router-dom'
 import appLogo from './assets/logo.png'
+import { AuthProvider } from './context/AuthContext'
 
 // Ensure favicon points to the built asset URL (works in dev and prod)
 const ensureFavicon = () => {
@@ -24,7 +25,9 @@ ensureFavicon()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )
