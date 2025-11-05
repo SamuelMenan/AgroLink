@@ -9,10 +9,11 @@ export default function SimpleHub() {
       </header>
 
       <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Habla con tus compradores" />
+    <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Habla con tus compradores" />
         <BigButton to="/dashboard/products/new" icon="add_circle" title="Publicar producto" subtitle="Publica fácil y rápido" />
         <BigButton to="/dashboard/products" icon="inventory_2" title="Mis publicaciones" subtitle="Edita o elimina" />
   <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Habla directo, sin solicitudes" />
+    <BigButton to="/dashboard/orders" icon="list_alt" title="Pedidos" subtitle="Gestiona estados y descargas" />
         <BigButton to="/dashboard/notifications" icon="notifications" title="Notificaciones" subtitle="Novedades y avisos" />
       </section>
 

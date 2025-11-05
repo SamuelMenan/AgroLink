@@ -17,6 +17,7 @@ import EditProduct from './pages/products/EditProduct'
 import NotificationsPage from './pages/notifications/NotificationsPage'
 import Messages from './pages/messages/Messages'
 import SimpleHub from './pages/SimpleHub'
+import OrdersDashboard from './pages/orders/OrdersDashboard'
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
           {/* Rutas de solicitudes eliminadas. Usar Mensajes en su lugar. */}
           <Route path="/dashboard/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/dashboard/orders" element={<OrdersDashboard />} />
         </Route>
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />

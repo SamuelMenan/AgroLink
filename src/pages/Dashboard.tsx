@@ -9,10 +9,10 @@ export default function Dashboard() {
           <h2 className="font-semibold">Publicar productos</h2>
           <p className="text-sm text-gray-600">Publica nuevos productos con fotos y precios.</p>
         </a>
-        <div className="rounded border p-4">
-          <h2 className="font-semibold">Ventas</h2>
-          <p className="text-sm text-gray-600">Revisa pedidos y estado de pagos.</p>
-        </div>
+        <a href="/dashboard/orders" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
+          <h2 className="font-semibold">Pedidos</h2>
+          <p className="text-sm text-gray-600">Revisa pedidos y actualiza su estado.</p>
+        </a>
         <a href="/dashboard/products" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
           <h2 className="font-semibold">Mis publicaciones</h2>
           <p className="text-sm text-gray-600">Edita o elimina tus publicaciones.</p>
