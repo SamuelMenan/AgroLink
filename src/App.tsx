@@ -18,6 +18,7 @@ import NotificationsPage from './pages/notifications/NotificationsPage'
 import Messages from './pages/messages/Messages'
 import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
+import AccountPrivacy from './pages/settings/AccountPrivacy'
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
           <Route path="/dashboard/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/dashboard/orders" element={<OrdersDashboard />} />
+          <Route path="/dashboard/settings" element={<AccountPrivacy />} />
         </Route>
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />

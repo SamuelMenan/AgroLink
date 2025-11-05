@@ -21,6 +21,10 @@ export default function Dashboard() {
           <h2 className="font-semibold">Mensajes</h2>
           <p className="text-sm text-gray-600">Chatea directamente con compradores y vendedores.</p>
         </a>
+        <a href="/dashboard/settings" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
+          <h2 className="font-semibold">Configuración</h2>
+          <p className="text-sm text-gray-600">Perfil y privacidad de tu cuenta.</p>
+        </a>
         <div className="md:col-span-3">
           <MessagesWidget />
         </div>
