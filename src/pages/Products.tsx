@@ -5,6 +5,7 @@ import { ensureConversationWith, sendMessage } from '../services/messagingServic
 import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
+import { getRatingSummary } from '../services/reviewsService'
 
 export default function Products() {
   const [q, setQ] = useState('')
@@ -130,6 +131,20 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     if (userLat==null || userLng==null || p.lat==null || p.lng==null) return null
     return haversineKm(userLat, userLng, p.lat, p.lng)
   }, [userLat, userLng, p.lat, p.lng])
+  const [rating, setRating] = useState<{avg:number|null,count:number}>({ avg: null, count: 0 })
+  useEffect(()=>{
+    let alive = true
+    ;(async ()=>{
+      try {
+        const s = await getRatingSummary(p.id)
+        if (!alive) return
+        setRating({ avg: s.avg, count: s.count })
+      } catch {
+        // ignore rating errors silently
+      }
+    })()
+    return ()=>{ alive = false }
+  }, [p.id])
   if (removed) return null
   async function sendMarketplaceMessage(){
     setErr(null)
@@ -162,8 +177,19 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       <h3 className="mt-3 text-lg font-semibold">{p.name}</h3>
       <p className="line-clamp-2 text-sm text-gray-600">{p.description}</p>
       <div className="mt-2 flex items-center justify-between text-sm text-gray-700">
-  <span className="font-semibold text-green-700">${p.price.toLocaleString()}</span>
+        <span className="font-semibold text-green-700">${p.price.toLocaleString()}</span>
         <span>{p.quantity} u.</span>
+      </div>
+      <div className="mt-1 flex items-center justify-between text-xs text-gray-600">
+        {rating.avg!=null ? (
+          <span title={`${rating.avg} de 5 (${rating.count})`} className="inline-flex items-center gap-1">
+            <span className="text-amber-500">{'★'.repeat(Math.round(rating.avg))}{'☆'.repeat(5-Math.round(rating.avg))}</span>
+            <span>{rating.avg.toFixed(1)} ({rating.count})</span>
+          </span>
+        ) : (
+          <span className="text-gray-400">Sin calificaciones</span>
+        )}
+        <span />
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-gray-600">
         <span>{p.location || 'Sin ubicación'}</span>

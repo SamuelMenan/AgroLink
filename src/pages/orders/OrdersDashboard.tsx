@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import type { Order, OrderFilters } from '../../services/ordersService'
 import { exportOrderSummary, listOrdersForBuyer, listOrdersForSeller, updateOrderStatus } from '../../services/ordersService'
+import { createReview } from '../../services/reviewsService'
 
 const STATUS_LABELS: Record<Order['status'], string> = {
   pendiente: 'Pendiente',
@@ -125,6 +126,9 @@ export default function OrdersDashboard(){
                   <span className="material-icons-outlined text-base">download</span>
                   Resumen
                 </button>
+                {role==='buyer' && o.status==='entregado' && (
+                  <ReviewInline productId={o.product_id} orderId={o.id} />
+                )}
               </div>
             </li>
           ))}
@@ -188,4 +192,57 @@ function StatusPill({ status }: { status: Order['status'] }){
     : status === 'entregado' ? 'bg-green-100 text-green-800'
     : 'bg-red-100 text-red-800'
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{STATUS_LABELS[status]}</span>
+}
+
+function ReviewInline({ productId, orderId }: { productId: string; orderId: string }){
+  const { user } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [status, setStatus] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    setStatus(null)
+    if (comment.trim().length < 10) { setStatus('El comentario debe tener al menos 10 caracteres.'); return }
+    if (comment.trim().length > 300) { setStatus('El comentario no puede exceder 300 caracteres.'); return }
+    if (!user) return
+    try {
+      setSaving(true)
+      await createReview({ product_id: productId, buyer_id: user.id, order_id: orderId, rating, comment })
+      setStatus('¡Gracias por tu reseña!')
+      setOpen(false)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'No se pudo enviar la reseña'
+      setStatus(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <button onClick={()=> setOpen(v=>!v)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm hover:bg-gray-50">
+        <span className="material-icons-outlined text-base">rate_review</span>
+        Calificar
+      </button>
+      {open && (
+        <div className="z-10 mt-2 rounded-md border bg-white p-3 shadow">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Puntaje:</label>
+            <select value={rating} onChange={(e)=> setRating(Number(e.target.value))} className="rounded border px-2 py-1 text-sm">
+              {[1,2,3,4,5].map(n=> <option key={n} value={n}>{n} ⭐</option>)}
+            </select>
+          </div>
+          <textarea value={comment} onChange={(e)=> setComment(e.target.value)} placeholder="Escribe tu comentario (10-300 caracteres)"
+            className="mt-2 w-64 rounded border px-2 py-1 text-sm" rows={3} />
+          <div className="mt-2 flex items-center gap-2">
+            <button disabled={saving} onClick={submit} className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">Enviar</button>
+            <button onClick={()=> setOpen(false)} className="rounded-md border px-3 py-1.5 text-sm">Cancelar</button>
+            {status && <span className="text-xs text-gray-600">{status}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
