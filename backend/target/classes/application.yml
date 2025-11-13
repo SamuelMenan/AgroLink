@@ -1,0 +1,18 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agrolink-backend
+
+# Expose swagger UI at /swagger-ui.html
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Supabase integration placeholders (if you want to call Supabase from backend)
+supabase:
+  url: ${SUPABASE_URL:}
+  serviceKey: ${SUPABASE_SERVICE_KEY:}
