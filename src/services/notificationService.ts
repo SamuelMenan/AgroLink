@@ -45,7 +45,7 @@ export async function deleteNotification(id: string): Promise<void> {
   if (!res.ok) throw new Error('No se pudo eliminar notificación')
 }
 
-export function subscribeNotifications() { return () => {} }
+export function subscribeNotifications(_userId: string, _onNotification: (n: NotificationItem) => void) { void _userId; void _onNotification; return () => {} }
 
 // Helpers for mock/local mode
 // Local storage helpers removed post-migration.

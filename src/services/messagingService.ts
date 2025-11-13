@@ -63,18 +63,23 @@ export async function listConversations(userId: string): Promise<Conversation[]>
 }
 
 // Batch fetch other participant ids for many conversations (exclude current user)
-export async function getConversationsParticipants(): Promise<Record<string,string[]>> {
-  // Not implemented in backend yet; return empty map to avoid errors.
+export async function getConversationsParticipants(_conversationIds?: string[], _excludeUserId?: string): Promise<Record<string,string[]>> {
+  void _conversationIds; void _excludeUserId
+  // Not implemented en backend todavía; devolvemos mapa vacío.
   return {}
 }
 
 // Unread counts per conversation for a user based on message_receipts (rows without read_at)
-export async function getUnreadCountByConversation(): Promise<Record<string, number>> {
-  // Receipts not migrated yet.
+export async function getUnreadCountByConversation(_userId?: string): Promise<Record<string, number>> {
+  void _userId
+  // Receipts aún no migrados; devolver 0 para todos.
   return {}
 }
 
-export async function loadMessages(conversationId: string): Promise<DecryptedMessage[]> {
+export async function loadMessages(userId: string, conversationId: string): Promise<DecryptedMessage[]>
+export async function loadMessages(conversationId: string): Promise<DecryptedMessage[]>
+export async function loadMessages(a: string, b?: string): Promise<DecryptedMessage[]> {
+  const conversationId = b ?? a
   const keyB64 = getStoredKey(conversationId)
   if (!keyB64) return []
   const key = await importKeyBase64(keyB64)
@@ -106,14 +111,14 @@ export async function sendMessage(conversationId: string, senderId: string, text
   if (!res.ok) throw new Error('No se pudo enviar mensaje')
 }
 
-export function subscribeMessages() { return () => {} }
+export function subscribeMessages(_conversationId?: string, _onNew?: () => void) { void _conversationId; void _onNew; return () => {} }
 
-export function subscribeReceipts() { return () => {} }
+export function subscribeReceipts(_conversationId?: string, _onReceipt?: () => void) { void _conversationId; void _onReceipt; return () => {} }
 
-export async function markDelivered() { /* not implemented post-migration */ }
-export async function markRead() { /* not implemented post-migration */ }
+export async function markDelivered(_userId?: string, _messageIds?: string[]) { void _userId; void _messageIds; }
+export async function markRead(_userId?: string, _messageIds?: string[]) { void _userId; void _messageIds; }
 
-export async function softDeleteMessage() { /* not implemented post-migration */ }
+export async function softDeleteMessage(_messageId?: string) { void _messageId; }
 
 export async function getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]> {
   // Stub: backend aún no implementado. Ignora parámetros para evitar lint unused.
@@ -122,13 +127,14 @@ export async function getOtherParticipantIds(conversationId: string, excludeUser
 }
 
 // Typing indicator via realtime broadcast
-export function subscribeTyping() { return () => {} }
-export async function sendTyping() { /* not implemented */ }
+export function subscribeTyping(_conversationId?: string, _onTyping?: (evt: { userId: string }) => void) { void _conversationId; void _onTyping; return () => {} }
+export async function sendTyping(_conversationId?: string, _userId?: string) { void _conversationId; void _userId; }
 
 // Attachments
 export async function uploadAttachment(): Promise<{ url: string; mime: string }> {
   throw new Error('Adjuntos no migrados aún')
 }
-export async function sendAttachment(): Promise<void> {
+export async function sendAttachment(_conversationId?: string, _userId?: string, _file?: File): Promise<void> {
+  void _conversationId; void _userId; void _file;
   throw new Error('Adjuntos no migrados aún')
 }

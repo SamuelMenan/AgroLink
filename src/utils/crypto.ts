@@ -24,7 +24,8 @@ export async function exportKeyBase64(key: CryptoKey): Promise<string> {
 export async function importKeyBase64(b64: string): Promise<CryptoKey> {
   if (!subtle) throw new Error('WebCrypto no disponible')
   const bytes = base64ToBytes(b64)
-  return subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+  const raw = arrayBufferFromBytes(bytes)
+  return subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }
 
 // Local storage helpers
@@ -43,7 +44,8 @@ export async function encryptText(key: CryptoKey, plaintext: string): Promise<{ 
     return { ivB64: '', ctB64: bytesToBase64(new TextEncoder().encode(plaintext)) }
   }
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12))
-  const ctBuf = await subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext))
+  const data = new TextEncoder().encode(plaintext)
+  const ctBuf = await subtle.encrypt({ name: 'AES-GCM', iv: arrayBufferFromBytes(iv) }, key, arrayBufferFromBytes(data))
   const ct = new Uint8Array(ctBuf)
   return { ivB64: bytesToBase64(iv), ctB64: bytesToBase64(ct) }
 }
@@ -56,7 +58,7 @@ export async function decryptText(key: CryptoKey, ivB64: string, ctB64: string):
   }
   const iv = base64ToBytes(ivB64)
   const ct = base64ToBytes(ctB64)
-  const ptBuf = await subtle.decrypt({ name: 'AES-GCM', iv }, key, ct)
+  const ptBuf = await subtle.decrypt({ name: 'AES-GCM', iv: arrayBufferFromBytes(iv) }, key, arrayBufferFromBytes(ct))
   return new TextDecoder().decode(ptBuf)
 }
 
@@ -81,5 +83,12 @@ export async function deriveConversationKey(userA: string, userB: string): Promi
   const hashBuf = await subtle.digest('SHA-256', data)
   const hashBytes = new Uint8Array(hashBuf)
   // Use first 32 bytes directly as raw key
-  return subtle.importKey('raw', hashBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+  return subtle.importKey('raw', arrayBufferFromBytes(hashBytes), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+}
+
+// Convierte un Uint8Array en un ArrayBuffer independiente (no SharedArrayBuffer)
+function arrayBufferFromBytes(bytes: Uint8Array): ArrayBuffer {
+  const out = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(out).set(bytes)
+  return out
 }
