@@ -13,22 +13,24 @@ import NotFound from './pages/NotFound'
 import PublishProduct from './pages/products/PublishProduct'
 import MyProducts from './pages/products/MyProducts'
 import EditProduct from './pages/products/EditProduct'
-// import RealtimeNotifications from './components/RealtimeNotifications'
+// RealtimeNotifications eliminado en migración a backend-only.
 import NotificationsPage from './pages/notifications/NotificationsPage'
 import Messages from './pages/messages/Messages'
 import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'
+import OAuthCallback from './pages/OAuthCallback'
 
 function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
       <Navbar />
-  {/* RealtimeNotifications removido: ya no hay flujo de solicitudes */}
+  {/* RealtimeNotifications eliminado */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/oauth/callback" element={<OAuthCallback />} />
   <Route path="/forgot-password" element={<ForgotPassword />} />
   <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute />}>

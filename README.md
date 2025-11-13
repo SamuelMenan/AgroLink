@@ -4,7 +4,7 @@
 
 Plataforma digital para conectar campesinos con consumidores, eliminando intermediarios.
 
-⚡ React + TypeScript + Vite · 🎨 Tailwind CSS v4 · 🧭 React Router · 🔐 (Próximo) Supabase
+⚡ React + TypeScript + Vite · 🎨 Tailwind CSS v4 · 🧭 React Router · 🔐 Backend API (Spring Boot + Supabase proxy)
 
 </div>
 
@@ -14,12 +14,12 @@ AgroLink facilita la venta directa de productos agrícolas: precios justos para 
 
 ## 🧱 Stack técnico
 
-- React 19 + TypeScript
+- React 19 + TypeScript (frontend)
 - Vite 7 (dev server y build)
-- Tailwind CSS v4 (con `@tailwindcss/postcss`)
-- React Router DOM (enrutamiento SPA)
+- Tailwind CSS v4 (`@tailwindcss/postcss`)
+- React Router DOM (SPA)
 - ESLint (reglas básicas)
-- (Próximo) Supabase: auth, base de datos, storage de imágenes
+- Spring Boot (backend) con capa proxy hacia Supabase (auth, PostgREST, storage) — el frontend ya NO se conecta directo a Supabase.
 
 ## 📁 Estructura del proyecto
 
@@ -39,7 +39,7 @@ src/
     Products.tsx       # /products
     Cart.tsx           # /cart
     NotFound.tsx       # 404
-  services/            # (Próximo) Clientes de API/Supabase
+  services/            # Clientes de API (fetch a backend); sin SDK de Supabase
   types/               # Tipos compartidos (incluye static.d.ts para assets)
   utils/               # Utilidades/ayudantes
   App.tsx              # Rutas y layout principal
@@ -101,19 +101,24 @@ npm run build
 npm run preview
 ```
 
-## ⚙️ Variables de entorno (Supabase – próximo)
+## ⚙️ Variables de entorno
 
-Cuando integremos Supabase, crea un archivo `.env` en la raíz con:
+El frontend ya no requiere URL ni claves de Supabase. Todo acceso a base de datos y storage ocurre en el backend.
 
+Backend (Spring Boot) debe definir:
 ```bash
-VITE_SUPABASE_URL=https://<your-project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<your-anon-key>
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_SERVICE_KEY=<service-role-key>
+SUPABASE_ANON_KEY=<anon-key>
+ENCRYPTION_KEY=<64 hex chars o base64 de 32 bytes>
 ```
 
-Sugerido:
-- Bucket de imágenes para productos (por ejemplo, `products`).
-- Tablas: `users`, `products`, `orders`, `reviews`.
-- `AuthContext` para gestionar usuario, login/logout y rutas protegidas.
+Notas:
+- `SUPABASE_SERVICE_KEY` se usa en el servidor para operaciones privilegiadas (no exponerlo en frontend).
+- `ENCRYPTION_KEY` habilita cifrado AES-GCM para mensajes (y futuros campos sensibles). Puede ser:
+  - Hex de 64 caracteres (256-bit) o
+  - Base64 de 32 bytes.
+- El frontend solo maneja tokens JWT emitidos por el backend (`/api/auth/*`).
 
 ## 🧩 Scripts disponibles
 
@@ -125,12 +130,13 @@ Sugerido:
 ## 🗺️ Roadmap
 
 - [ ] UI Kit (Button, Input, Card, Badge) en `components/ui/`.
-- [ ] Auth con Supabase + `AuthContext` + `ProtectedRoute` para `/dashboard`.
-- [ ] CRUD de productos (listar, crear, editar, subir imágenes a storage).
-- [ ] Carrito persistente y flujo de checkout básico.
-- [ ] Reseñas de productos (`reviews`).
-- [ ] (Opcional) Chatbot asistente para productores.
-- [ ] Tests unitarios básicos.
+- [ ] Hardening de Auth (refresh tokens + expiración clara).
+- [ ] CRUD completo de productos y media (ya proxied vía backend).
+- [ ] Carrito persistente y checkout.
+- [ ] Reseñas de productos (backend listo, frontend extendido parcialmente).
+- [ ] Mensajería con mejoras (receipts realtime; pendiente adaptación sin Supabase client).
+- [ ] Notificaciones push (ya migradas a backend; falta canal realtime opcional).
+- [ ] Tests unitarios y de integración frontend/backend.
 
 ## 🧪 Cómo probar rápidamente
 
@@ -147,18 +153,21 @@ Sugerido:
 
 ## 📦 Despliegue
 
-Puedes desplegar con Vercel/Netlify fácilmente:
+Frontend:
+```bash
+npm run build
+```
+Sirve el contenido de `dist/` con CDN / hosting estático (Vercel, Netlify, etc.).
 
-- Build command: `npm run build`
-- Publish directory: `dist`
+Backend: empaquetar JAR y desplegar en servicio que proteja las variables sensibles (`SUPABASE_*`, `ENCRYPTION_KEY`).
 
-Para GitHub Pages, podemos añadir un workflow de Actions y configurar el `base` de Vite si fuese necesario. Pídelo y lo dejo listo.
+Separar dominios (ej. `api.agrolink.com` y `app.agrolink.com`) y habilitar CORS seguro.
 
 ## 🤝 Contribuir
 
-1. Crea una rama desde `main`.
-2. Haz tus cambios y crea commits claros.
-3. Abre un Pull Request describiendo el cambio y cómo probarlo.
+1. Crear rama desde `main`.
+2. Cambios con foco mínimo (no mezclar refactors grandes con features).
+3. PR describiendo: motivación, endpoints afectados y pasos de prueba.
 
 ## 📄 Licencia
 
