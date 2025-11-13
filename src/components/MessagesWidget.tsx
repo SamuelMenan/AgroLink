@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { listConversations, getConversationsParticipants, getUnreadCountByConversation } from '../services/messagingService'
-import { fetchUsersInfo, type PublicUserInfo } from '../services/userInfoService'
+import { fetchUsersInfo, type PublicUserInfo } from '../services/userInfoApi'
 
 type Item = { cid: string; other?: PublicUserInfo; unread: number }
 

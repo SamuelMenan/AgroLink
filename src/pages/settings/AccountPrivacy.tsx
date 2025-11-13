@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import type { Profile, Visibility } from '../../services/profileService'
-import { changeMyPassword, getMyProfile, saveMyProfile } from '../../services/profileService'
+import type { Profile, Visibility } from '../../services/profileApi'
+import { changeMyPassword, getMyProfile, saveMyProfile } from '../../services/profileApi'
 
 function useDebounced<T>(value: T, delay = 600): T {
   const [debounced, setDebounced] = useState(value)

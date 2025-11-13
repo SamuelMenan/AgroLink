@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { deleteProduct, listMyProducts } from '../../services/productService'
+import { listMyProducts, deleteProduct } from '../../services/productService'
 import type { Product } from '../../types/product'
 import { Link } from 'react-router-dom'
 
@@ -16,8 +16,8 @@ export default function MyProducts() {
       if (!user) return
       try {
         setLoading(true)
-        const data = await listMyProducts(user.id)
-        if (mounted) setItems(data)
+        const products = await listMyProducts(user.id)
+        if (mounted) setItems(products)
       } catch {
         if (mounted) setError('Error cargando productos')
       } finally {
@@ -30,8 +30,13 @@ export default function MyProducts() {
 
   async function onDelete(id: string) {
     if (!confirm('¿Eliminar este producto?')) return
-    await deleteProduct(id)
-    setItems(prev => prev.filter(p => p.id !== id))
+    try {
+      await deleteProduct(id)
+      setItems(prev => prev.filter(p => p.id !== id))
+    } catch (e) {
+      console.error(e)
+      alert('Error eliminando producto')
+    }
   }
 
   return (

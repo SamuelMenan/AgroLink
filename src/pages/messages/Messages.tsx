@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import type { DecryptedMessage } from '../../services/messagingService'
 import { ensureConversationWith, listConversations, loadMessages, markDelivered, markRead, sendMessage, subscribeMessages, subscribeTyping, sendTyping, getConversationsParticipants, getUnreadCountByConversation, sendAttachment } from '../../services/messagingService'
-import { fetchUsersInfo, type PublicUserInfo } from '../../services/userInfoService'
+import { fetchUsersInfo, type PublicUserInfo } from '../../services/userInfoApi'
 
 export default function Messages(){
   const { user } = useAuth()

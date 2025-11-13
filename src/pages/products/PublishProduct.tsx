@@ -56,7 +56,7 @@ export default function PublishProduct() {
       ) : (
         <>
           <ProductForm title="Publicar producto" onSubmit={onSubmit} submitLabel="Publicar" />
-          <p className="mt-4 text-sm text-gray-600">Nota: si no has configurado la base de datos y el bucket de imágenes en Supabase, el sistema funcionará en modo local (sin persistencia real de imágenes).</p>
+          <p className="mt-4 text-sm text-gray-600">Nota: asegúrate de que el backend tenga configurado almacenamiento de imágenes; de lo contrario las URLs no serán persistentes.</p>
         </>
       )}
     </main>
