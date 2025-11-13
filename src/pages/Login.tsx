@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { isSupabaseEnabled } from '../services/supabaseClient'
+// Lógica OAuth pendiente de implementación backend.
 import CaptchaGate from '../components/CaptchaGate'
 
 export default function Login() {
@@ -108,7 +108,7 @@ export default function Login() {
               setGoogleLoading(true)
               try {
                 await signInWithGoogle(redirectAbs)
-                if (!isSupabaseEnabled()) navigate('/simple', { replace: true })
+                navigate('/simple', { replace: true })
               } finally {
                 setGoogleLoading(false)
               }
@@ -136,7 +136,7 @@ export default function Login() {
               setFacebookLoading(true)
               try {
                 await signInWithFacebook(redirectAbs)
-                if (!isSupabaseEnabled()) navigate('/simple', { replace: true })
+                navigate('/simple', { replace: true })
               } finally {
                 setFacebookLoading(false)
               }

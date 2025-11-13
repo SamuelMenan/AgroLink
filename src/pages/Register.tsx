@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { isSupabaseEnabled } from '../services/supabaseClient'
+// OAuth/confirmaciones se manejarán completamente en backend.
 
 type Form = {
   fullName: string
@@ -151,7 +151,7 @@ export default function Register() {
               setGoogleLoading(true)
               try {
                 await signInWithGoogle(redirectAbs)
-                if (!isSupabaseEnabled()) navigate('/dashboard', { replace: true })
+                navigate('/dashboard', { replace: true })
               } finally {
                 setGoogleLoading(false)
               }
@@ -180,7 +180,7 @@ export default function Register() {
               setFacebookLoading(true)
               try {
                 await signInWithFacebook(redirectAbs)
-                if (!isSupabaseEnabled()) navigate('/dashboard', { replace: true })
+                navigate('/dashboard', { replace: true })
               } finally {
                 setFacebookLoading(false)
               }

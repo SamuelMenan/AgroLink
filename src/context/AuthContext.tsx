@@ -1,14 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { User as SupaUser, SignInWithPasswordCredentials } from '@supabase/supabase-js'
-import { supabase, isSupabaseEnabled } from '../services/supabaseClient'
+import { deriveUserFromTokens, signInEmail, signInPhone, signUp, signOut as backendSignOut, refreshSession, getAccessToken, setTokens, type AuthUser, type AuthTokens } from '../services/apiAuth'
 
-type User = {
-  id: string
-  email?: string
-  phone?: string
-  full_name?: string
-}
+type User = AuthUser
 
 type AuthContextValue = {
   user: User | null
@@ -33,15 +27,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     async function init() {
       try {
-        if (isSupabaseEnabled()) {
-          const { data } = await supabase.auth.getUser()
-          if (mounted) setUser(data.user ? mapUser(data.user) : null)
-          supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ? mapUser(session.user) : null)
-          })
-        } else {
-          // Modo sin Supabase: sin sesión
-          if (mounted) setUser(null)
+        const token = getAccessToken()
+        if (token && mounted) {
+          // Try refresh silently to get user info
+          try {
+            const refreshed = await refreshSession()
+            const u = deriveUserFromTokens(refreshed)
+            setUser(u)
+          } catch {
+            setUser(null)
+          }
+        } else if (mounted) {
+          setUser(null)
         }
       } finally {
         if (mounted) setLoading(false)
@@ -54,91 +51,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = async () => {
-    if (!isSupabaseEnabled()) {
-      setUser(null)
-      return
-    }
-    await supabase.auth.signOut()
+    backendSignOut()
+    setUser(null)
   }
 
   const signUpWithEmail: AuthContextValue['signUpWithEmail'] = async ({ fullName, email, password, phone }) => {
-    if (!isSupabaseEnabled()) {
-      // Mock: "crea" el usuario localmente para continuar desarrollo sin backend
-      setUser({ id: 'mock', email, phone, full_name: fullName })
-      return { needsEmailConfirmation: false }
+    try {
+      const resp = await signUp(fullName, email, password, phone)
+      const u = deriveUserFromTokens(resp)
+      setUser(u)
+      // Si el backend exige confirmación por correo, puede faltar access_token.
+      const needsEmailConfirmation = !resp.access_token
+      return { needsEmailConfirmation }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error registro'
+      return { error: msg }
     }
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, phone },
-        emailRedirectTo: `${location.origin}/dashboard`,
-      },
-    })
-    if (error) return { error: error.message }
-    // Si el proyecto requiere confirmación por email, no habrá sesión inmediata
-    const needsEmailConfirmation = !data.session
-    if (data.user && data.session) setUser(mapUser(data.user))
-    return { needsEmailConfirmation }
   }
 
   const signInWithEmail: AuthContextValue['signInWithEmail'] = async ({ email, password }) => {
-    if (!isSupabaseEnabled()) {
-      setUser({ id: 'mock-email', email, full_name: email.split('@')[0] })
+    try {
+      const resp = await signInEmail(email, password)
+      setUser(deriveUserFromTokens(resp))
       return {}
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error inicio sesión'
+      return { error: msg }
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { error: error.message }
-    if (data.user) setUser(mapUser(data.user))
-    return {}
   }
 
+  // Iniciar flujo OAuth: redirige al endpoint authorize de Supabase.
+  // Supabase devolverá tokens en el fragmento (#access_token=...). Callback se procesa en /oauth/callback.
   const signInWithGoogle = async (redirectTo?: string) => {
-    if (!isSupabaseEnabled()) {
-      setUser({ id: 'mock-google', email: 'mock.google@example.com', full_name: 'Usuario Google' })
-      return
-    }
-    const dest = redirectTo ?? `${location.origin}/dashboard`
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: dest } })
+    const next = redirectTo || '/simple'
+    window.location.href = `/api/auth/oauth/start?provider=google&next=${encodeURIComponent(next)}`
   }
 
   const signInWithFacebook = async (redirectTo?: string) => {
-    if (!isSupabaseEnabled()) {
-      setUser({ id: 'mock-facebook', email: 'mock.facebook@example.com', full_name: 'Usuario Facebook' })
-      return
-    }
-    const dest = redirectTo ?? `${location.origin}/dashboard`
-    await supabase.auth.signInWithOAuth({ provider: 'facebook', options: { redirectTo: dest } })
+    const next = redirectTo || '/simple'
+    window.location.href = `/api/auth/oauth/start?provider=facebook&next=${encodeURIComponent(next)}`
   }
 
   const signInWithCredentials: AuthContextValue['signInWithCredentials'] = async ({ identifier, password }) => {
     const normalized = identifier.trim()
     const isPhone = /^\+?\d{7,15}$/.test(normalized) || /^\d{7,15}$/.test(normalized.replace(/\s|-/g, ''))
-    if (!isSupabaseEnabled()) {
-      setUser({ id: 'mock-cred', email: isPhone ? undefined : normalized, phone: isPhone ? normalized : undefined, full_name: 'Usuario' })
+    try {
+      const resp = isPhone ? await signInPhone(normalized, password) : await signInEmail(normalized, password)
+      setUser(deriveUserFromTokens(resp))
       return {}
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error inicio sesión'
+      return { error: msg }
     }
-    const creds: SignInWithPasswordCredentials = isPhone
-      ? { phone: normalized, password }
-      : { email: normalized, password }
-    const { data, error } = await supabase.auth.signInWithPassword(creds)
-    if (error) return { error: error.message }
-    if (data.user) setUser(mapUser(data.user))
+  }
+
+  const resetPassword: AuthContextValue['resetPassword'] = async (_email) => {
+    void _email;
+    console.warn('Reset password debe implementarse via backend (email).')
     return {}
   }
 
-  const resetPassword: AuthContextValue['resetPassword'] = async (email) => {
-    if (!isSupabaseEnabled()) return {}
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/reset-password` })
-    if (error) return { error: error.message }
-    return {}
-  }
-
-  const updatePassword: AuthContextValue['updatePassword'] = async (newPassword) => {
-    if (!isSupabaseEnabled()) return {}
-    const { data, error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) return { error: error.message }
-    if (data.user) setUser(mapUser(data.user))
+  const updatePassword: AuthContextValue['updatePassword'] = async (_newPassword) => {
+    void _newPassword;
+    console.warn('Update password debe implementarse via backend. Usar refresh luego.')
     return {}
   }
 
@@ -153,6 +128,4 @@ export function useAuth() {
   return ctx
 }
 
-function mapUser(u: SupaUser): User {
-  return { id: u.id, email: u.email ?? undefined, phone: u.phone ?? undefined, full_name: u.user_metadata?.full_name }
-}
+// mapUser removed; backend tokens provide info
