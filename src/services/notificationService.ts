@@ -15,7 +15,8 @@ export type NotificationItem = {
   created_at: string
 }
 
-const API_BASE = '/api/notifications'
+// Versioned API base path (was '/api/notifications' before versioning)
+const API_BASE = '/api/v1/notifications'
 
 export async function listRecentNotifications(userId: string, limit = 12): Promise<NotificationItem[]> {
   const res = await fetch(`${API_BASE}/by-user/${userId}?limit=${limit}`)

@@ -84,12 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Supabase devolverá tokens en el fragmento (#access_token=...). Callback se procesa en /oauth/callback.
   const signInWithGoogle = async (redirectTo?: string) => {
     const next = redirectTo || '/simple'
-    window.location.href = `/api/auth/oauth/start?provider=google&next=${encodeURIComponent(next)}`
+    window.location.href = `/api/v1/auth/oauth/start?provider=google&next=${encodeURIComponent(next)}`
   }
 
   const signInWithFacebook = async (redirectTo?: string) => {
     const next = redirectTo || '/simple'
-    window.location.href = `/api/auth/oauth/start?provider=facebook&next=${encodeURIComponent(next)}`
+    window.location.href = `/api/v1/auth/oauth/start?provider=facebook&next=${encodeURIComponent(next)}`
   }
 
   const signInWithCredentials: AuthContextValue['signInWithCredentials'] = async ({ identifier, password }) => {

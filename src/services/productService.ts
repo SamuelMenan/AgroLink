@@ -23,10 +23,10 @@ async function uploadSingleImage(userId: string, file: File): Promise<string> {
   form.append('bucket', 'product-images')
   form.append('path', path)
   form.append('file', file)
-  const res = await fetch('/api/storage/upload', { method: 'POST', body: form })
+  const res = await fetch('/api/v1/storage/upload', { method: 'POST', body: form })
   if (!res.ok) throw new Error(`Error subiendo imagen (${res.status})`)
   // backend returns JSON or plain string; assume path only -> construct public URL via /api/storage/public-url
-  const publicUrlRes = await fetch(`/api/storage/public-url?bucket=product-images&path=${encodeURIComponent(path)}`)
+  const publicUrlRes = await fetch(`/api/v1/storage/public-url?bucket=product-images&path=${encodeURIComponent(path)}`)
   const url = await publicUrlRes.text()
   return url
 }
@@ -55,7 +55,7 @@ export async function createProduct(input: CreateInput): Promise<Product> {
     lng: input.lng,
     created_at: new Date().toISOString()
   }
-  const res = await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  const res = await fetch('/api/v1/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   if (!res.ok) throw new Error(`Error creando producto (${res.status})`)
   const data = await res.json()
   return Array.isArray(data) ? (data[0] as Product) : (data as Product)
@@ -63,28 +63,28 @@ export async function createProduct(input: CreateInput): Promise<Product> {
 
 export async function listMyProducts(userId: string): Promise<Product[]> {
   const query = `select=*&user_id=eq.${userId}&order=created_at.desc`
-  const res = await fetch(`/api/products?q=${encodeURIComponent(query)}`)
+  const res = await fetch(`/api/v1/products?q=${encodeURIComponent(query)}`)
   if (!res.ok) throw new Error('Error listando productos')
   return await res.json() as Product[]
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
   const query = `select=*&id=eq.${id}&limit=1`
-  const res = await fetch(`/api/products?q=${encodeURIComponent(query)}`)
+  const res = await fetch(`/api/v1/products?q=${encodeURIComponent(query)}`)
   if (!res.ok) return null
   const arr = await res.json() as Product[]
   return arr[0] || null
 }
 
 export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id' | 'user_id' | 'created_at'>>): Promise<Product> {
-  const res = await fetch(`/api/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  const res = await fetch(`/api/v1/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
   if (!res.ok) throw new Error('Error actualizando producto')
   const data = await res.json()
   return Array.isArray(data) ? (data[0] as Product) : (data as Product)
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+  const res = await fetch(`/api/v1/products/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Error eliminando producto')
 }
 
@@ -128,7 +128,7 @@ export async function listPublicProducts(filters: SearchFilters = {}): Promise<P
   // order by created_at desc for relevance default
   parts.push('order=created_at.desc')
   const query = parts.join('&')
-  const res = await fetch(`/api/products?q=${encodeURIComponent(query)}`)
+  const res = await fetch(`/api/v1/products?q=${encodeURIComponent(query)}`)
   if (!res.ok) throw new Error('Error listando productos públicos')
   let items = await res.json() as Product[]
   // Client-side distance filter & sorting enhancements

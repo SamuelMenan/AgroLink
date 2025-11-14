@@ -6,7 +6,7 @@ export type Conversation = { id: string; created_at: string }
 export type Message = { id: string; conversation_id: string; sender_id: string; content_ciphertext: string; iv: string; mime_type?: string; created_at: string }
 export type DecryptedMessage = Message & { content: string; status?: 'sent'|'delivered'|'read' }
 
-const API_BASE = '/api'
+const API_BASE = '/api/v1'
 
 export async function ensureConversationWith(userId: string, otherUserId: string): Promise<Conversation> {
   // List existing conversations for user and check if other user participates
@@ -54,19 +54,43 @@ export async function listConversations(userId: string): Promise<Conversation[]>
     const r = await fetch(`${API_BASE}/conversations/${id}`)
     if (r.ok) {
       const json = await r.json()
-      if (json && json.id) out.push(json as Conversation)
+      const obj = Array.isArray(json) ? (json[0] ?? null) : json
+      if (obj && obj.id) out.push(obj as Conversation)
     }
   }
   // Fallback: si el backend no tiene endpoint detallado, devolvemos objetos mínimos.
   if (out.length === 0) return ids.map(id => ({ id, created_at: new Date().toISOString() }))
-  return out
+  // Filtrar conversaciones sin otros participantes (solo el usuario actual)
+  const filtered: Conversation[] = []
+  for (const conv of out) {
+    try {
+      const others = await getOtherParticipantIds(conv.id, userId)
+      if (others.length > 0) filtered.push(conv)
+    } catch {
+      // Si falla, mantener conversación para no perder datos
+      filtered.push(conv)
+    }
+  }
+  return filtered
 }
 
 // Batch fetch other participant ids for many conversations (exclude current user)
-export async function getConversationsParticipants(_conversationIds?: string[], _excludeUserId?: string): Promise<Record<string,string[]>> {
-  void _conversationIds; void _excludeUserId
-  // Not implemented en backend todavía; devolvemos mapa vacío.
-  return {}
+export async function getConversationsParticipants(conversationIds: string[] = [], excludeUserId?: string): Promise<Record<string,string[]>> {
+  if (!conversationIds.length) return {}
+  const entries = await Promise.all(conversationIds.map(async (convId) => {
+    try {
+      const res = await fetch(`${API_BASE}/conversations/${convId}/participants`)
+      if (!res.ok) return [convId, [] as string[]] as const
+      const rows: { user_id: string }[] = await res.json()
+      const ids = (rows || []).map(r => r.user_id).filter(uid => !excludeUserId || uid !== excludeUserId)
+      return [convId, ids] as const
+    } catch {
+      return [convId, [] as string[]] as const
+    }
+  }))
+  const map: Record<string, string[]> = {}
+  for (const [k, v] of entries) map[k] = v
+  return map
 }
 
 // Unread counts per conversation for a user based on message_receipts (rows without read_at)
@@ -81,17 +105,21 @@ export async function loadMessages(conversationId: string): Promise<DecryptedMes
 export async function loadMessages(a: string, b?: string): Promise<DecryptedMessage[]> {
   const conversationId = b ?? a
   const keyB64 = getStoredKey(conversationId)
-  if (!keyB64) return []
-  const key = await importKeyBase64(keyB64)
+  const hasKey = !!keyB64
+  const key = hasKey ? await importKeyBase64(keyB64) : undefined
   const res = await fetch(`${API_BASE}/messages?conversationId=${encodeURIComponent(conversationId)}`)
   if (!res.ok) throw new Error('No se pudieron cargar mensajes')
   const list: Message[] = await res.json()
   const out: DecryptedMessage[] = []
   for (const m of list) {
-    try {
-      const content = await decryptText(key, m.iv, m.content_ciphertext)
-      out.push({ ...m, content })
-    } catch {
+    if (hasKey && key) {
+      try {
+        const content = await decryptText(key, m.iv, m.content_ciphertext)
+        out.push({ ...m, content })
+      } catch {
+        out.push({ ...m, content: '[mensaje cifrado]' })
+      }
+    } else {
       out.push({ ...m, content: '[mensaje cifrado]' })
     }
   }
@@ -100,15 +128,33 @@ export async function loadMessages(a: string, b?: string): Promise<DecryptedMess
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, mime: string = 'text/plain'): Promise<void> {
   const keyB64 = getStoredKey(conversationId)
-  if (!keyB64) throw new Error('No hay clave de conversación')
-  const key = await importKeyBase64(keyB64)
-  const { ivB64, ctB64 } = await encryptText(key, text)
-  const res = await fetch(`${API_BASE}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
-  })
-  if (!res.ok) throw new Error('No se pudo enviar mensaje')
+  if (!keyB64) {
+    // Sin clave local: delegar cifrado al backend con plaintext
+    const res = await fetch(`${API_BASE}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
+    })
+    if (!res.ok) throw new Error('No se pudo enviar mensaje')
+    return
+  } else {
+    // Con clave local: cifrar en cliente
+    const key = await importKeyBase64(keyB64)
+    const { ivB64, ctB64 } = await encryptText(key, text)
+    const res = await fetch(`${API_BASE}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
+    })
+    if (!res.ok) throw new Error('No se pudo enviar mensaje')
+  }
+}
+
+// Helper para iniciar contacto desde productos u otros contextos
+export async function contactUser(currentUserId: string, otherUserId: string, initialText: string = 'Hola. ¿Sigue estando disponible?'): Promise<Conversation> {
+  const conv = await ensureConversationWith(currentUserId, otherUserId)
+  await sendMessage(conv.id, currentUserId, initialText)
+  return conv
 }
 
 export function subscribeMessages(_conversationId?: string, _onNew?: () => void) { void _conversationId; void _onNew; return () => {} }
@@ -121,9 +167,10 @@ export async function markRead(_userId?: string, _messageIds?: string[]) { void 
 export async function softDeleteMessage(_messageId?: string) { void _messageId; }
 
 export async function getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]> {
-  // Stub: backend aún no implementado. Ignora parámetros para evitar lint unused.
-  void conversationId; void excludeUserId;
-  return []
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}/participants`)
+  if (!res.ok) return []
+  const rows: { user_id: string }[] = await res.json()
+  return (rows || []).map(r => r.user_id).filter(uid => uid !== excludeUserId)
 }
 
 // Typing indicator via realtime broadcast

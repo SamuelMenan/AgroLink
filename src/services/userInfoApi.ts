@@ -1,19 +1,58 @@
-export type PublicUserInfo = { id: string; full_name?: string | null; email?: string | null; location?: string | null; phone?: string | null }
+const API_BASE = '/api/v1/users'
 
-// Stub que consulta backend (cuando exista) o devuelve datos ficticios.
+export type PublicUserInfo = {
+  id: string
+  full_name: string
+  email: string
+  phone: string | null
+}
+
 export async function fetchUsersInfo(ids: string[]): Promise<Record<string, PublicUserInfo>> {
   if (!ids.length) return {}
+
   try {
-    const resp = await fetch('/api/users/public-info', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+    const resp = await fetch(`${API_BASE}/public-info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
     })
-    if (!resp.ok) throw new Error('Backend público info no disponible')
-    const data = await resp.json() as PublicUserInfo[]
-    return data.reduce<Record<string, PublicUserInfo>>((acc, row) => { acc[row.id] = row; return acc }, {})
-  } catch {
-    // Fallback simple
+
+    // Cualquier código no 2xx hace que usemos fallback
+    if (!resp.ok) {
+      throw new Error(`PUBLIC_INFO_ERROR_${resp.status}`)
+    }
+
+    const data = await resp.json()
+
     const map: Record<string, PublicUserInfo> = {}
-    ids.forEach(id => { map[id] = { id, full_name: 'Usuario', email: 'usuario@example.com', location: null, phone: null } })
+
+    for (const row of data) {
+      // Supabase suele devolver user_id; si en algún momento aliasas a id, también lo soportamos
+      const uid: string | undefined = row.user_id || row.id
+      if (!uid) continue
+
+      map[uid] = {
+        id: uid,
+        full_name: row.full_name ?? 'Usuario',
+        email: row.email ?? '',
+        phone: row.phone ?? null,
+      }
+    }
+
+    return map
+  } catch {
+    // Fallback simple: no lanzamos error hacia Messages.tsx
+    const map: Record<string, PublicUserInfo> = {}
+
+    ids.forEach(id => {
+      map[id] = {
+        id,
+        full_name: 'Usuario',
+        email: 'usuario@example.com',
+        phone: null,
+      }
+    })
+
     return map
   }
 }

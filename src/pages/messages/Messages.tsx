@@ -32,11 +32,13 @@ export default function Messages(){
       const uniqueOtherIds = Array.from(new Set(Object.values(partsMap).flat()))
       const usersMap = uniqueOtherIds.length ? await fetchUsersInfo(uniqueOtherIds) : {}
       const unreadMap = await getUnreadCountByConversation(user.id)
-      const mapped = convs.map(c => ({
-        id: c.id,
-        other: (partsMap[c.id] && partsMap[c.id][0]) ? usersMap[partsMap[c.id][0]] : undefined,
-        unread: unreadMap[c.id] || 0
-      }))
+      const mapped = convs
+        .filter(c => partsMap[c.id] && partsMap[c.id].length > 0)
+        .map(c => ({
+          id: c.id,
+          other: usersMap[partsMap[c.id][0]] || undefined,
+          unread: unreadMap[c.id] || 0
+        }))
       setConversations(mapped)
       // Selección automática de la primera conversación si no hay selección
       if (!withUser && !convId && mapped.length > 0) {

@@ -60,20 +60,22 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   return JSON.parse(text);
 }
 
+const AUTH_PREFIX = '/api/v1/auth'; // centralizado para evitar duplicaciones y errores al versionar
+
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
-  const resp = await post('/api/auth/sign-up', { email, password, data: { full_name: fullName, phone } });
+  const resp = await post(`${AUTH_PREFIX}/sign-up`, { email, password, data: { full_name: fullName, phone } });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
   return resp;
 }
 
 export async function signInEmail(email: string, password: string) {
-  const resp = await post('/api/auth/sign-in', { email, password });
+  const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
   return resp;
 }
 
 export async function signInPhone(phone: string, password: string) {
-  const resp = await post('/api/auth/sign-in', { phone, password });
+  const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
   return resp;
 }
@@ -81,9 +83,15 @@ export async function signInPhone(phone: string, password: string) {
 export async function refreshSession() {
   const rt = getRefreshToken();
   if (!rt) throw new Error('No refresh token');
-  const resp = await post('/api/auth/refresh', { refresh_token: rt });
+  const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
   return resp;
 }
 
 export function signOut() { clearTokens(); }
+
+const backendBase = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+
+// Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend.
+export const getOAuthStartUrl = (provider: string, next: string) =>
+  `${backendBase ? backendBase : ''}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;

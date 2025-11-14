@@ -4,6 +4,7 @@ import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
+import { contactUser } from '../services/messagingService'
 
 export default function Products() {
   const [q, setQ] = useState('')
@@ -146,19 +147,30 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
   if (removed) return null
   async function sendMarketplaceMessage(){
     setErr(null)
-    if (!user) { navigate(`/login?intent=message&next=/products`); return }
-    if (isOwner) { setErr('Este es tu producto.'); return }
+    if (!user) {
+      navigate(`/login?intent=message&next=/products`)
+      return
+    }
+    if (isOwner) {
+      setErr('Este es tu producto.')
+      return
+    }
     const text = msgText.trim()
-    if (!text) { setErr('Escribe un mensaje.'); return }
+    if (!text) {
+      setErr('Escribe un mensaje.')
+      return
+    }
     setSendingMsg(true)
     try {
-      // Crear conversación si no existe (simple heurística: nueva cada vez)
-      // Mensajería será manejada via backend en próxima iteración
+      // Crear/asegurar conversación con el vendedor y enviar mensaje inicial
+      await contactUser(user.id, p.user_id, text)
       setMsgSent(true)
     } catch (e) {
       const m = e instanceof Error ? e.message : 'No fue posible enviar el mensaje'
       setErr(m)
-    } finally { setSendingMsg(false) }
+    } finally {
+      setSendingMsg(false)
+    }
   }
   function onAddToCart(){
     addToCart({ id: p.id, name: p.name, price: p.price, image_url: p.image_urls?.[0], seller_id: p.user_id }, 1)
