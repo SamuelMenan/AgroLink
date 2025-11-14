@@ -90,8 +90,8 @@ export async function refreshSession() {
 
 export function signOut() { clearTokens(); }
 
-const backendBase = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const BASE_URL = process.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
 // Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend.
 export const getOAuthStartUrl = (provider: string, next: string) =>
-  `${backendBase ? backendBase : ''}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+  `${BASE_URL}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
