@@ -18,6 +18,16 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string, directUrlBase: string) {
+  // Best effort: ping health endpoints to wake Render. Ignore errors.
+  try {
+    await fetchImpl(`${proxyUrlBase}/actuator/health`, { cache: 'no-store' })
+  } catch { /* ignore */ }
+  try {
+    await fetchImpl(`${directUrlBase}/actuator/health`, { cache: 'no-store' })
+  } catch { /* ignore */ }
+}
+
 export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: FetchLike = fetch): Promise<Response> {
   if (!path.startsWith('/')) throw new Error('apiFetch expects a relative path starting with /')
 
@@ -43,7 +53,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     }
   } catch { /* ignore URL parse */ }
 
-  const maxRetries = 3
+  const maxRetries = 5
   let lastError: unknown = null
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -56,7 +66,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         res = await fetchImpl(second, { ...init, headers })
       }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
-        await sleep(300 * (attempt + 1))
+        await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
+        await sleep(300 * (attempt + 1) * 2)
         continue
       }
       return res
@@ -65,7 +76,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       try {
         const res2 = await fetchImpl(second, { ...init, headers })
         if (!res2.ok && [502, 503, 504].includes(res2.status) && attempt < maxRetries - 1) {
-          await sleep(300 * (attempt + 1))
+          await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
+          await sleep(300 * (attempt + 1) * 2)
           continue
         }
         return res2
@@ -73,7 +85,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         lastError = e2
       }
       if (attempt < maxRetries - 1) {
-        await sleep(300 * (attempt + 1))
+        await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
+        await sleep(300 * (attempt + 1) * 2)
         continue
       }
     }
