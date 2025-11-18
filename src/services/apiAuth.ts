@@ -45,13 +45,22 @@ export function deriveUserFromTokens(resp: BackendAuthResponse): AuthUser | null
 
 type PostBody = Record<string, unknown>
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
-  // Ensure we call the correct backend host in production
-  const url = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
+  // Primary: call backend host directly; Fallback: same-origin (Vercel rewrite)
+  const primaryUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
+  const fallbackUrl = path; // relative -> goes via Vercel proxy in prod
   const maxRetries = 3;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      let res = await fetch(primaryUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      // If CORS/proxy/cold-start fails, try fallback once per attempt in PROD
+      if (!res.ok && import.meta.env.PROD && !/^https?:\/\//i.test(path)) {
+        if ([502, 503, 504].includes(res.status)) {
+          // brief wait before trying fallback
+          await new Promise(r => setTimeout(r, 150));
+          res = await fetch(fallbackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        }
+      }
       const text = await res.text();
       if (!res.ok) {
         // Reintentos rápidos para errores de gateway/cold start
