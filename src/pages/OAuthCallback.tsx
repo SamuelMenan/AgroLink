@@ -46,13 +46,31 @@ export default function OAuthCallback() {
     const searchParams = new URLSearchParams(window.location.search)
     const rawNext = searchParams.get('next') || '/simple'
 
-    // Normalizar next a una ruta interna
     let nextPath = '/simple'
+
     try {
-      const url = new URL(rawNext, window.location.origin)
-      nextPath = url.pathname + url.search + url.hash
+      // Permitir tanto rutas relativas como URLs absolutas de TU mismo origin
+      const url = new URL(
+        rawNext,
+        rawNext.startsWith('http') ? undefined : window.location.origin,
+      )
+
+      // Si la URL es de otro origin, ignórala por seguridad
+      if (url.origin !== window.location.origin) {
+        nextPath = '/simple'
+      } else if (url.pathname === '/oauth/callback') {
+        // Evita bucles: nunca navegues de nuevo al callback
+        nextPath = '/simple'
+      } else {
+        nextPath = url.pathname + url.search + url.hash
+      }
     } catch {
-      nextPath = rawNext.startsWith('/') ? rawNext : '/simple'
+      // Si rawNext es algo como "/simple" o "simple"
+      if (rawNext.startsWith('/')) {
+        nextPath = rawNext
+      } else {
+        nextPath = '/simple'
+      }
     }
 
     navigate(nextPath || '/simple', { replace: true })
