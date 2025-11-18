@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { setTokens, deriveUserFromTokens, type BackendAuthResponse } from '../services/apiAuth'
+import { setTokens, type BackendAuthResponse } from '../services/apiAuth'
 
 export default function OAuthCallback() {
   const navigate = useNavigate()
@@ -25,26 +25,28 @@ export default function OAuthCallback() {
       return
     }
 
-    const resp: BackendAuthResponse = {
+    const backendResp: BackendAuthResponse = {
       access_token,
       refresh_token,
       token_type,
       expires_in,
+      // Supabase implicit flow NO suele incluir "user" en este hash;
+      // lo dejamos undefined y más adelante podrás recuperarlo vía backend si lo necesitas.
+      user: undefined,
     }
 
     try {
-      setTokens(resp)
-      const user = deriveUserFromTokens(resp)
-      console.info('[OAuthCallback] Usuario autenticado vía OAuth:', user)
+      setTokens(backendResp)
+      console.info('[OAuthCallback] Tokens OAuth guardados correctamente')
     } catch (e) {
-      console.error('[OAuthCallback] Error procesando tokens OAuth', e)
+      console.error('[OAuthCallback] Error guardando tokens OAuth', e)
     }
 
-    // Leer next de la query (?next=...)
+    // Leer ?next=... de la query
     const searchParams = new URLSearchParams(window.location.search)
     const rawNext = searchParams.get('next') || '/simple'
 
-    // Normalizar next a ruta local (por si viene absoluta)
+    // Normalizar next a una ruta interna
     let nextPath = '/simple'
     try {
       const url = new URL(rawNext, window.location.origin)
