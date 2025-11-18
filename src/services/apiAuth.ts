@@ -45,11 +45,13 @@ export function deriveUserFromTokens(resp: BackendAuthResponse): AuthUser | null
 
 type PostBody = Record<string, unknown>
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
+  // Ensure we call the correct backend host in production
+  const url = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
   const maxRetries = 3;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const text = await res.text();
       if (!res.ok) {
         // Reintentos rápidos para errores de gateway/cold start
