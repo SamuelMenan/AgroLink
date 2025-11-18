@@ -27,20 +27,33 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const primaryUrl = `${BASE_URL}${path}`
-  const fallbackUrl = path // same-origin (Vercel rewrite in prod)
+  const directUrl = `${BASE_URL}${path}`
+  const proxyUrl = path // same-origin (Vercel rewrite in prod)
+
+  // Prefer proxy first in PROD when origins differ to avoid noisy CORS errors.
+  let first = directUrl
+  let second = proxyUrl
+  try {
+    const base = new URL(BASE_URL)
+    if (import.meta.env.PROD && typeof window !== 'undefined') {
+      if (base.origin !== window.location.origin) {
+        first = proxyUrl
+        second = directUrl
+      }
+    }
+  } catch { /* ignore URL parse */ }
 
   const maxRetries = 3
   let lastError: unknown = null
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      let res = await fetchImpl(primaryUrl, { ...init, headers })
-      if (!res.ok && import.meta.env.PROD) {
-        if ([502, 503, 504].includes(res.status)) {
-          await sleep(150)
-          res = await fetchImpl(fallbackUrl, { ...init, headers })
-        }
+      // Try first URL
+      let res = await fetchImpl(first, { ...init, headers })
+      // If gateway error, try second URL within same attempt
+      if (!res.ok && [502, 503, 504].includes(res.status)) {
+        await sleep(150)
+        res = await fetchImpl(second, { ...init, headers })
       }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
         await sleep(300 * (attempt + 1))
@@ -48,7 +61,17 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       }
       return res
     } catch (e) {
-      lastError = e
+      // Network/CORS error: try the other URL once in this attempt
+      try {
+        const res2 = await fetchImpl(second, { ...init, headers })
+        if (!res2.ok && [502, 503, 504].includes(res2.status) && attempt < maxRetries - 1) {
+          await sleep(300 * (attempt + 1))
+          continue
+        }
+        return res2
+      } catch (e2) {
+        lastError = e2
+      }
       if (attempt < maxRetries - 1) {
         await sleep(300 * (attempt + 1))
         continue

@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient'
 export type RequestStatus = 'pendiente' | 'aceptada' | 'rechazada'
 export type CommercialRequest = {
   id: string
@@ -13,7 +14,7 @@ export type CommercialRequest = {
 export async function createRequest(params: { buyerId: string; producerId: string; productId?: string; message?: string }): Promise<CommercialRequest> {
   const body = { buyerId: params.buyerId, producerId: params.producerId, productId: params.productId, message: params.message }
   try {
-    const resp = await fetch('/api/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const resp = await apiFetch('/api/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!resp.ok) throw new Error('No se pudo crear solicitud')
     return await resp.json() as CommercialRequest
   } catch {
@@ -26,7 +27,7 @@ export async function createRequest(params: { buyerId: string; producerId: strin
 
 export async function listMyRequests(buyerId: string): Promise<CommercialRequest[]> {
   try {
-    const resp = await fetch(`/api/requests/mine?buyerId=${encodeURIComponent(buyerId)}`)
+    const resp = await apiFetch(`/api/requests/mine?buyerId=${encodeURIComponent(buyerId)}`)
     if (!resp.ok) throw new Error('No se pudo listar solicitudes')
     return await resp.json() as CommercialRequest[]
   } catch {
@@ -36,7 +37,7 @@ export async function listMyRequests(buyerId: string): Promise<CommercialRequest
 
 export async function listIncomingRequests(producerId: string): Promise<CommercialRequest[]> {
   try {
-    const resp = await fetch(`/api/requests/incoming?producerId=${encodeURIComponent(producerId)}`)
+    const resp = await apiFetch(`/api/requests/incoming?producerId=${encodeURIComponent(producerId)}`)
     if (!resp.ok) throw new Error('No se pudo listar solicitudes entrantes')
     return await resp.json() as CommercialRequest[]
   } catch {
@@ -46,7 +47,7 @@ export async function listIncomingRequests(producerId: string): Promise<Commerci
 
 export async function updateRequestStatus(id: string, status: RequestStatus): Promise<void> {
   try {
-    const resp = await fetch(`/api/requests/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+    const resp = await apiFetch(`/api/requests/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
     if (!resp.ok) throw new Error('No se pudo actualizar estado')
   } catch {
     // Silencio stub

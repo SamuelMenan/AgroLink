@@ -1,4 +1,5 @@
 import { decryptText, encryptText, exportKeyBase64, generateConversationKey, getStoredKey, importKeyBase64, storeKey } from '../utils/crypto'
+import { apiFetch } from './apiClient'
 
 // Servicio de mensajería backend-only. Realtime y recibos se implementarán más adelante vía WebSocket/SSE.
 
@@ -16,14 +17,14 @@ export async function ensureConversationWith(userId: string, otherUserId: string
     if (parts.includes(otherUserId)) return conv
   }
   // Create new conversation
-  const res = await fetch(`${API_BASE}/conversations`, { method: 'POST' })
+  const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
   if (!res.ok) throw new Error('No se pudo crear conversación')
   const createdJson = await res.json()
   // El backend puede devolver arreglo de filas insertadas; tomamos la primera si aplica.
   const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
   // Add participants
   const add = async (uid: string) => {
-    const r = await fetch(`${API_BASE}/conversations/${conv.id}/participants`, {
+    const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: uid })
@@ -43,7 +44,7 @@ export async function ensureConversationWith(userId: string, otherUserId: string
 }
 
 export async function listConversations(userId: string): Promise<Conversation[]> {
-  const res = await fetch(`${API_BASE}/conversations/by-user/${userId}`)
+  const res = await apiFetch(`${API_BASE}/conversations/by-user/${userId}`)
   if (!res.ok) throw new Error('No se pudieron listar conversaciones')
   const rows = await res.json()
   const ids: string[] = (rows||[]).map((r: { conversation_id: string }) => r.conversation_id)
@@ -51,7 +52,7 @@ export async function listConversations(userId: string): Promise<Conversation[]>
   // Fetch each conversation (could be optimized via backend join later)
   const out: Conversation[] = []
   for (const id of ids) {
-    const r = await fetch(`${API_BASE}/conversations/${id}`)
+    const r = await apiFetch(`${API_BASE}/conversations/${id}`)
     if (r.ok) {
       const json = await r.json()
       const obj = Array.isArray(json) ? (json[0] ?? null) : json
@@ -79,7 +80,7 @@ export async function getConversationsParticipants(conversationIds: string[] = [
   if (!conversationIds.length) return {}
   const entries = await Promise.all(conversationIds.map(async (convId) => {
     try {
-      const res = await fetch(`${API_BASE}/conversations/${convId}/participants`)
+      const res = await apiFetch(`${API_BASE}/conversations/${convId}/participants`)
       if (!res.ok) return [convId, [] as string[]] as const
       const rows: { user_id: string }[] = await res.json()
       const ids = (rows || []).map(r => r.user_id).filter(uid => !excludeUserId || uid !== excludeUserId)
@@ -107,7 +108,7 @@ export async function loadMessages(a: string, b?: string): Promise<DecryptedMess
   const keyB64 = getStoredKey(conversationId)
   const hasKey = !!keyB64
   const key = hasKey ? await importKeyBase64(keyB64) : undefined
-  const res = await fetch(`${API_BASE}/messages?conversationId=${encodeURIComponent(conversationId)}`)
+  const res = await apiFetch(`${API_BASE}/messages?conversationId=${encodeURIComponent(conversationId)}`)
   if (!res.ok) throw new Error('No se pudieron cargar mensajes')
   const list: Message[] = await res.json()
   const out: DecryptedMessage[] = []
@@ -130,7 +131,7 @@ export async function sendMessage(conversationId: string, senderId: string, text
   const keyB64 = getStoredKey(conversationId)
   if (!keyB64) {
     // Sin clave local: delegar cifrado al backend con plaintext
-    const res = await fetch(`${API_BASE}/messages`, {
+    const res = await apiFetch(`${API_BASE}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
@@ -141,7 +142,7 @@ export async function sendMessage(conversationId: string, senderId: string, text
     // Con clave local: cifrar en cliente
     const key = await importKeyBase64(keyB64)
     const { ivB64, ctB64 } = await encryptText(key, text)
-    const res = await fetch(`${API_BASE}/messages`, {
+    const res = await apiFetch(`${API_BASE}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
@@ -167,7 +168,7 @@ export async function markRead(_userId?: string, _messageIds?: string[]) { void 
 export async function softDeleteMessage(_messageId?: string) { void _messageId; }
 
 export async function getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]> {
-  const res = await fetch(`${API_BASE}/conversations/${conversationId}/participants`)
+  const res = await apiFetch(`${API_BASE}/conversations/${conversationId}/participants`)
   if (!res.ok) return []
   const rows: { user_id: string }[] = await res.json()
   return (rows || []).map(r => r.user_id).filter(uid => uid !== excludeUserId)

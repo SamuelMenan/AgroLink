@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient'
 
 export type Order = {
   id: string
@@ -33,7 +34,7 @@ export async function createOrder(input: { product_id: string; seller_id: string
     created_at: now,
     updated_at: now
   }
-  const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  const res = await apiFetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   if (!res.ok) throw new Error('Error creando orden')
   const data = await res.json()
   return Array.isArray(data) ? data[0] as Order : data as Order
@@ -51,7 +52,7 @@ export async function listOrdersForSeller(sellerId: string, filters: OrderFilter
   if (filters.from) params.push(`created_at=gte.${filters.from}`)
   if (filters.to) params.push(`created_at=lte.${filters.to}`)
   const q = params.join('&')
-  const res = await fetch(`/api/orders?q=${encodeURIComponent(q)}`)
+  const res = await apiFetch(`/api/orders?q=${encodeURIComponent(q)}`)
   if (!res.ok) throw new Error('Error listando órdenes vendedor')
   return await res.json() as Order[]
 }
@@ -68,13 +69,13 @@ export async function listOrdersForBuyer(buyerId: string, filters: OrderFilters 
   if (filters.from) params.push(`created_at=gte.${filters.from}`)
   if (filters.to) params.push(`created_at=lte.${filters.to}`)
   const q = params.join('&')
-  const res = await fetch(`/api/orders?q=${encodeURIComponent(q)}`)
+  const res = await apiFetch(`/api/orders?q=${encodeURIComponent(q)}`)
   if (!res.ok) throw new Error('Error listando órdenes comprador')
   return await res.json() as Order[]
 }
 
 export async function updateOrderStatus(orderId: string, status: Order['status']): Promise<void> {
-  const res = await fetch(`/api/orders/${orderId}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+  const res = await apiFetch(`/api/orders/${orderId}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
   if (!res.ok) throw new Error('Error actualizando estado orden')
 }
 

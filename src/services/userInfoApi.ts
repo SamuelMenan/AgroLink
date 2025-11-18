@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient'
 const API_BASE = '/api/v1/users'
 
 export type PublicUserInfo = {
@@ -11,7 +12,7 @@ export async function fetchUsersInfo(ids: string[]): Promise<Record<string, Publ
   if (!ids.length) return {}
 
   try {
-    const resp = await fetch(`${API_BASE}/public-info`, {
+    const resp = await apiFetch(`${API_BASE}/public-info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids }),

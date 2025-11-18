@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient'
 export type Visibility = 'public' | 'contacts' | 'private'
 export type Profile = {
   user_id: string
@@ -17,7 +18,7 @@ export type ProfilePatch = Partial<Pick<Profile, 'full_name' | 'email' | 'phone'
 
 export async function getMyProfile(userId: string): Promise<Profile> {
   try {
-    const resp = await fetch(`/api/profile/${encodeURIComponent(userId)}`)
+    const resp = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`)
     if (!resp.ok) throw new Error('Perfil no disponible')
     return await resp.json() as Profile
   } catch {
@@ -39,7 +40,7 @@ export async function getMyProfile(userId: string): Promise<Profile> {
 
 export async function saveMyProfile(userId: string, patch: ProfilePatch): Promise<Profile> {
   try {
-    const resp = await fetch(`/api/profile/${encodeURIComponent(userId)}`, {
+    const resp = await apiFetch(`/api/profile/${encodeURIComponent(userId)}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
     })
     if (!resp.ok) throw new Error('No se pudo guardar perfil')
@@ -51,7 +52,7 @@ export async function saveMyProfile(userId: string, patch: ProfilePatch): Promis
 
 export async function changeMyPassword(newPassword: string): Promise<void> {
   try {
-    const resp = await fetch('/api/profile/password', {
+    const resp = await apiFetch('/api/profile/password', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword }),
     })
     if (!resp.ok) throw new Error('No se pudo cambiar contraseña')

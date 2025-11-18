@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient'
 // Backend-only reviews service using /api/reviews facade
 
 export type Review = {
@@ -12,7 +13,7 @@ export type Review = {
 export type RatingSummary = { avg: number | null; count: number }
 
 export async function createReview(input: { productId: string; userId: string; rating: number; comment: string }): Promise<Review> {
-  const res = await fetch('/api/reviews', {
+  const res = await apiFetch('/api/reviews', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ productId: input.productId, userId: input.userId, rating: input.rating, comment: input.comment })
@@ -22,7 +23,7 @@ export async function createReview(input: { productId: string; userId: string; r
 }
 
 export async function listReviewsByProduct(productId: string): Promise<Review[]> {
-  const res = await fetch(`/api/reviews/product/${productId}`)
+  const res = await apiFetch(`/api/reviews/product/${productId}`)
   if (!res.ok) throw new Error('Error listando reseñas')
   return await res.json() as Review[]
 }
