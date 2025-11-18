@@ -91,11 +91,22 @@ export async function refreshSession() {
 export function signOut() { clearTokens(); }
 
 // Determinar backend base URL
-// En producción (Vercel) DEBE venir de VITE_BACKEND_URL para no llamar al dominio de Vercel.
-const BASE_URL =
-  import.meta.env.PROD
-    ? import.meta.env.VITE_BACKEND_URL
-    : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080');
+// - En producción: usar siempre VITE_BACKEND_URL si está definida;
+//   si no, caer en window.location.origin para no generar rutas relativas.
+// - En desarrollo: VITE_BACKEND_URL o localhost:8080.
+const resolveBaseUrl = () => {
+  // Solo acceder a window en entorno browser
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_BACKEND_URL || origin;
+  }
+
+  // Desarrollo
+  return import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+};
+
+const BASE_URL = resolveBaseUrl();
 
 // Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend (solo en dev con proxy).
 export const getOAuthStartUrl = (provider: string, next: string) =>
