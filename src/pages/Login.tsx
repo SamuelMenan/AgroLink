@@ -19,10 +19,13 @@ export default function Login() {
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/simple'
   const intent = params.get('intent')
-  const redirectAbs = useMemo(
-    () => `${location.origin}${nextParam.startsWith('/') ? nextParam : '/simple'}`,
-    [nextParam]
-  )
+
+  // URL absoluta a donde queremos ir después de login
+  const redirectAbs = useMemo(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const path = nextParam.startsWith('/') ? nextParam : '/simple'
+    return `${origin}${path}`
+  }, [nextParam])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
