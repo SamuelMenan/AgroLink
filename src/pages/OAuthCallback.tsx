@@ -6,13 +6,13 @@ export default function OAuthCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Ejemplo de URL:
-    // https://agro-link-jet.vercel.app/oauth/callback?next=/simple#access_token=...&refresh_token=...&expires_in=...
-    const hash = window.location.hash.startsWith('#')
+    // URL ejemplo:
+    // https://agro-link-jet.vercel.app/oauth/callback?next=/simple#access_token=...&refresh_token=...
+    const rawHash = window.location.hash.startsWith('#')
       ? window.location.hash.slice(1)
       : window.location.hash
-    const hashParams = new URLSearchParams(hash)
 
+    const hashParams = new URLSearchParams(rawHash)
     const access_token = hashParams.get('access_token')
     const refresh_token = hashParams.get('refresh_token') || ''
     const token_type = hashParams.get('token_type') || undefined
@@ -21,12 +21,12 @@ export default function OAuthCallback() {
       : undefined
 
     if (!access_token) {
-      // Si no hay token, volvemos al login
+      // Sin token, volvemos al login
       navigate('/login', { replace: true })
       return
     }
 
-    const backendResp: BackendAuthResponse = {
+    const resp: BackendAuthResponse = {
       access_token,
       refresh_token,
       token_type,
@@ -34,19 +34,17 @@ export default function OAuthCallback() {
     }
 
     try {
-      // Guardar tokens en localStorage
-      setTokens(backendResp)
-      const user = deriveUserFromTokens(backendResp)
-      console.info('[OAuthCallback] Usuario autenticado via OAuth:', user)
+      setTokens(resp)
+      const user = deriveUserFromTokens(resp)
+      console.info('[OAuthCallback] Usuario autenticado vía OAuth:', user)
     } catch (e) {
       console.error('[OAuthCallback] Error procesando tokens OAuth', e)
     }
 
-    // Leer next de query (?next=/simple o ?next=https://.../simple)
+    // Leer ?next de la query: puede ser /simple o una URL absoluta
     const searchParams = new URLSearchParams(window.location.search)
     const rawNext = searchParams.get('next') || '/simple'
 
-    // Normalizar next a ruta dentro del mismo origin
     let nextPath = '/simple'
     try {
       const url = new URL(rawNext, window.location.origin)

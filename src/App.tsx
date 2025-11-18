@@ -25,21 +25,19 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
       <Navbar />
-  {/* RealtimeNotifications eliminado */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/oauth/callback" element={<OAuthCallback />} />
-  <Route path="/forgot-password" element={<ForgotPassword />} />
-  <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/simple" element={<SimpleHub />} />
           <Route path="/dashboard/products" element={<MyProducts />} />
           <Route path="/dashboard/products/new" element={<PublishProduct />} />
           <Route path="/dashboard/products/:id/edit" element={<EditProduct />} />
-          {/* Rutas de solicitudes eliminadas. Usar Mensajes en su lugar. */}
           <Route path="/dashboard/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/dashboard/orders" element={<OrdersDashboard />} />
