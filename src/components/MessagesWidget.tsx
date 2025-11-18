@@ -10,15 +10,26 @@ export default function MessagesWidget(){
   const [items, setItems] = useState<Item[]>([])
   const [totalUnread, setTotalUnread] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(()=>{
-    (async ()=>{
-      if (!user) { setItems([]); setTotalUnread(0); setLoading(false); return }
+    let active = true
+    ;(async ()=>{
+      if (!user) {
+        if (!active) return
+        setItems([])
+        setTotalUnread(0)
+        setError(null)
+        setLoading(false)
+        return
+      }
       setLoading(true)
       try {
         const convs = await listConversations(user.id)
+        if (!active) return
         const ids = convs.map(c=>c.id)
         const partsMap = await getConversationsParticipants(ids, user.id)
+        if (!active) return
         const uniqueOtherIds = Array.from(new Set(Object.values(partsMap).flat()))
         const usersMap = uniqueOtherIds.length ? await fetchUsersInfo(uniqueOtherIds) : {}
         const unreadMap = await getUnreadCountByConversation(user.id)
@@ -28,12 +39,21 @@ export default function MessagesWidget(){
           unread: unreadMap[c.id] || 0,
         }))
         list.sort((a,b)=> (b.unread - a.unread))
+        if (!active) return
         setItems(list)
         setTotalUnread(Object.values(unreadMap).reduce((acc, n)=> acc + (n||0), 0))
+        setError(null)
+      } catch (err) {
+        console.error('[MessagesWidget] load failed', err)
+        if (!active) return
+        setItems([])
+        setTotalUnread(0)
+        setError('No se pudieron cargar tus mensajes. Intenta nuevamente más tarde.')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     })()
+    return () => { active = false }
   }, [user])
 
   if (!user) return null
@@ -53,6 +73,8 @@ export default function MessagesWidget(){
       </div>
       {loading ? (
         <div className="text-sm text-gray-600">Cargando mensajes…</div>
+      ) : error ? (
+        <div className="text-sm text-red-600">{error}</div>
       ) : items.length === 0 ? (
         <div className="text-sm text-gray-600">Aún no tienes mensajes. Cuando alguien te escriba, los verás aquí.</div>
       ) : (

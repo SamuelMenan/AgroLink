@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { deriveUserFromTokens, signInEmail, signInPhone, signUp, signOut as backendSignOut, refreshSession, getAccessToken, getOAuthStartUrl, type AuthUser } from '../services/apiAuth'
+import { deriveUserFromTokens, signInEmail, signInPhone, signUp, signOut as backendSignOut, refreshSession, getAccessToken, getOAuthStartUrl, clearTokens, type AuthUser } from '../services/apiAuth'
 
 type User = AuthUser
 
@@ -33,13 +33,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const refreshed = await refreshSession()
             const u = deriveUserFromTokens(refreshed)
-            setUser(u)
-          } catch {
-            setUser(null)
+            if (mounted) {
+              setUser(u)
+            }
+          } catch (err) {
+            console.error('[AuthProvider] refreshSession failed during init', err)
+            clearTokens()
+            if (mounted) setUser(null)
           }
         } else if (mounted) {
           setUser(null)
         }
+      } catch (err) {
+        console.error('[AuthProvider] init failed', err)
+        clearTokens()
+        if (mounted) setUser(null)
       } finally {
         if (mounted) setLoading(false)
       }

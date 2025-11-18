@@ -174,6 +174,7 @@ export async function refreshSession() {
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     return resp;
   } catch (primaryErr) {
+    console.error('[apiAuth] refresh via backend failed', primaryErr)
     // Fallback final: invocar directamente a Supabase si se configuraron variables en frontend
     try {
       const supabaseResp = await supabaseRefreshFallback(rt);
@@ -181,6 +182,7 @@ export async function refreshSession() {
       console.info('[apiAuth] refreshSession: usado fallback directo a Supabase');
       return supabaseResp;
     } catch (fallbackErr) {
+      console.error('[apiAuth] Supabase fallback failed', fallbackErr);
       // Si el fallback también falla, devolver el error original con detalle del fallback
       const combined = new Error(
         `Refresh failed via backend: ${(primaryErr as Error).message}. Fallback to Supabase failed: ${(fallbackErr as Error).message}`

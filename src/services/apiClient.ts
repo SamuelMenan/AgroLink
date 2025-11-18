@@ -55,14 +55,17 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   const maxRetries = 5
   let lastError: unknown = null
+  let lastUrlTried = first
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // Try first URL
+      lastUrlTried = first
       let res = await fetchImpl(first, { ...init, headers })
       // If gateway error, try second URL within same attempt
       if (!res.ok && [502, 503, 504].includes(res.status)) {
         await sleep(150)
+        lastUrlTried = second
         res = await fetchImpl(second, { ...init, headers })
       }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
@@ -72,8 +75,10 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       }
       return res
     } catch (e) {
+      lastError = e
       // Network/CORS error: try the other URL once in this attempt
       try {
+        lastUrlTried = second
         const res2 = await fetchImpl(second, { ...init, headers })
         if (!res2.ok && [502, 503, 504].includes(res2.status) && attempt < maxRetries - 1) {
           await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
@@ -83,6 +88,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         return res2
       } catch (e2) {
         lastError = e2
+        lastUrlTried = second
       }
       if (attempt < maxRetries - 1) {
         await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
@@ -91,5 +97,11 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       }
     }
   }
-  throw lastError instanceof Error ? lastError : new Error('API request failed')
+  const error = lastError instanceof Error ? lastError : new Error('API request failed')
+  if (!(lastError instanceof Error)) {
+    ;(error as { cause?: unknown }).cause = lastError
+  }
+  ;(error as { url?: string }).url = lastUrlTried
+  console.error('[apiFetch] request failed after retries', { path, lastUrlTried, error })
+  throw error
 }
