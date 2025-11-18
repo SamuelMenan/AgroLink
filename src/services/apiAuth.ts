@@ -147,8 +147,9 @@ const resolveBaseUrl = () => {
   const envBackend = import.meta.env.VITE_BACKEND_URL;
 
   if (import.meta.env.PROD) {
-    const effective = envBackend || origin;
-    console.info('[apiAuth] ENV PROD. VITE_BACKEND_URL =', envBackend, 'origin =', origin, 'BASE_URL =', effective);
+    // En producción, fuerza same-origin y usa el rewrite de Vercel para evitar CORS.
+    const effective = '';
+    console.info('[apiAuth] ENV PROD. Ignorando VITE_BACKEND_URL (', envBackend, '). Usando same-origin via rewrite. origin =', origin);
     return effective;
   }
 
