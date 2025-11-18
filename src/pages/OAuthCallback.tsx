@@ -7,7 +7,7 @@ export default function OAuthCallback() {
 
   useEffect(() => {
     // URL ejemplo:
-    // https://agro-link-jet.vercel.app/oauth/callback?next=/simple#access_token=...&refresh_token=...
+    // https://agro-link-jet.vercel.app/oauth/callback?next=https://agro-link-jet.vercel.app/simple#access_token=...&refresh_token=...
     const rawHash = window.location.hash.startsWith('#')
       ? window.location.hash.slice(1)
       : window.location.hash
@@ -21,7 +21,6 @@ export default function OAuthCallback() {
       : undefined
 
     if (!access_token) {
-      // Sin token, volvemos al login
       navigate('/login', { replace: true })
       return
     }
@@ -41,10 +40,11 @@ export default function OAuthCallback() {
       console.error('[OAuthCallback] Error procesando tokens OAuth', e)
     }
 
-    // Leer ?next de la query: puede ser /simple o una URL absoluta
+    // Leer next de la query (?next=...)
     const searchParams = new URLSearchParams(window.location.search)
     const rawNext = searchParams.get('next') || '/simple'
 
+    // Normalizar next a ruta local (por si viene absoluta)
     let nextPath = '/simple'
     try {
       const url = new URL(rawNext, window.location.origin)
