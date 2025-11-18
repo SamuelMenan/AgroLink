@@ -90,7 +90,8 @@ export async function refreshSession() {
 
 export function signOut() { clearTokens(); }
 
-const BASE_URL = process.env.VITE_BACKEND_URL || 'http://localhost:8080';
+// Usar las env vars de Vite en vez de process.env (que es de Node)
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
 // Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend.
 export const getOAuthStartUrl = (provider: string, next: string) =>
