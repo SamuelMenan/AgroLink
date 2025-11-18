@@ -78,8 +78,30 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
       }
       return JSON.parse(text);
     } catch (e) {
-      lastError = e;
-      // Reintentar en errores de red (fetch) no-HTTP
+      // Network/CORS error before getting a Response
+      if (import.meta.env.PROD && !/^https?:\/\//i.test(path)) {
+        try {
+          const res = await fetch(fallbackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const text = await res.text();
+          if (res.ok) return JSON.parse(text);
+          if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+            continue;
+          }
+          try {
+            const json = JSON.parse(text);
+            const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
+            throw new Error(`Auth ${res.status}: ${detail}`);
+          } catch {
+            throw new Error(`Auth ${res.status}: ${text}`);
+          }
+        } catch (fallbackErr) {
+          lastError = fallbackErr;
+        }
+      } else {
+        lastError = e;
+      }
+      // Reintentar en errores de red
       if (attempt < maxRetries - 1) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
         continue;
