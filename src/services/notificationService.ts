@@ -17,32 +17,33 @@ export type NotificationItem = {
 
 // Versioned API base path (was '/api/notifications' before versioning)
 const API_BASE = '/api/v1/notifications'
+import { apiFetch } from './apiClient'
 
 export async function listRecentNotifications(userId: string, limit = 12): Promise<NotificationItem[]> {
-  const res = await fetch(`${API_BASE}/by-user/${userId}?limit=${limit}`)
+  const res = await apiFetch(`${API_BASE}/by-user/${userId}?limit=${limit}`)
   if (!res.ok) throw new Error('No se pudieron listar notificaciones')
   return await res.json()
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
-  const res = await fetch(`${API_BASE}/unread-count/${userId}`)
+  const res = await apiFetch(`${API_BASE}/unread-count/${userId}`)
   if (!res.ok) throw new Error('No se pudo obtener conteo no leídas')
   const rows = await res.json()
   return Array.isArray(rows) ? rows.length : 0
 }
 
 export async function markAsRead(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/${id}/read`, { method: 'PATCH' })
+  const res = await apiFetch(`${API_BASE}/${id}/read`, { method: 'PATCH' })
   if (!res.ok) throw new Error('No se pudo marcar como leída')
 }
 
 export async function markAllAsRead(userId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/read-all/${userId}`, { method: 'PATCH' })
+  const res = await apiFetch(`${API_BASE}/read-all/${userId}`, { method: 'PATCH' })
   if (!res.ok) throw new Error('No se pudo marcar todas')
 }
 
 export async function deleteNotification(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' })
+  const res = await apiFetch(`${API_BASE}/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('No se pudo eliminar notificación')
 }
 
