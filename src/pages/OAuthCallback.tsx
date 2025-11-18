@@ -30,8 +30,6 @@ export default function OAuthCallback() {
       refresh_token,
       token_type,
       expires_in,
-      // Supabase implicit flow NO suele incluir "user" en este hash;
-      // lo dejamos undefined y más adelante podrás recuperarlo vía backend si lo necesitas.
       user: undefined,
     }
 
@@ -50,13 +48,22 @@ export default function OAuthCallback() {
 
     try {
       // Permitir tanto rutas relativas como URLs absolutas de TU mismo origin
-      const url = new URL(
-        rawNext,
-        rawNext.startsWith('http') ? undefined : window.location.origin,
-      )
+      // Siempre proveemos base; si rawNext es absoluta, la base se ignora
+      const url = new URL(rawNext, window.location.origin)
 
-      // Si la URL es de otro origin, ignórala por seguridad
       if (url.origin !== window.location.origin) {
+        // Caso especial DEV: si estamos en Vercel y el next apunta a localhost,
+        // redirigimos explícitamente a localhost para facilitar pruebas locales.
+        const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/i.test(url.origin)
+        if (isLocalhost) {
+          try {
+            // Limpia URL actual antes de saltar de dominio
+            window.history.replaceState(null, '', window.location.pathname + window.location.search)
+          } catch { /* ignore */ }
+          window.location.replace(url.toString())
+          return
+        }
+        // Orígenes externos distintos a localhost: ignorar por seguridad
         nextPath = '/simple'
       } else if (url.pathname === '/oauth/callback') {
         // Evita bucles: nunca navegues de nuevo al callback
@@ -65,12 +72,15 @@ export default function OAuthCallback() {
         nextPath = url.pathname + url.search + url.hash
       }
     } catch {
-      // Si rawNext es algo como "/simple" o "simple"
-      if (rawNext.startsWith('/')) {
-        nextPath = rawNext
-      } else {
-        nextPath = '/simple'
-      }
+      // Si rawNext no es una URL válida, permitir solo rutas absolutas internas
+      nextPath = rawNext.startsWith('/') ? rawNext : '/simple'
+    }
+
+    // Limpia completamente hash y query del callback antes de navegar
+    try {
+      window.history.replaceState(null, '', window.location.pathname)
+    } catch {
+      // ignore
     }
 
     navigate(nextPath || '/simple', { replace: true })

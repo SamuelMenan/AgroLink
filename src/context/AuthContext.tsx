@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { deriveUserFromTokens, signInEmail, signInPhone, signUp, signOut as backendSignOut, refreshSession, getAccessToken, type AuthUser } from '../services/apiAuth'
+import { deriveUserFromTokens, signInEmail, signInPhone, signUp, signOut as backendSignOut, refreshSession, getAccessToken, getOAuthStartUrl, type AuthUser } from '../services/apiAuth'
 
 type User = AuthUser
 
@@ -84,12 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Supabase devolverá tokens en el fragmento (#access_token=...). Callback se procesa en /oauth/callback.
   const signInWithGoogle = async (redirectTo?: string) => {
     const next = redirectTo || '/simple'
-    window.location.href = `/api/v1/auth/oauth/start?provider=google&next=${encodeURIComponent(next)}`
+    const redirect_to = `${window.location.origin}/oauth/callback`
+    const baseUrl = getOAuthStartUrl('google', next)
+    const url = `${baseUrl}&redirect_to=${encodeURIComponent(redirect_to)}`
+    window.location.href = url
   }
 
   const signInWithFacebook = async (redirectTo?: string) => {
     const next = redirectTo || '/simple'
-    window.location.href = `/api/v1/auth/oauth/start?provider=facebook&next=${encodeURIComponent(next)}`
+    const redirect_to = `${window.location.origin}/oauth/callback`
+    const baseUrl = getOAuthStartUrl('facebook', next)
+    const url = `${baseUrl}&redirect_to=${encodeURIComponent(redirect_to)}`
+    window.location.href = url
   }
 
   const signInWithCredentials: AuthContextValue['signInWithCredentials'] = async ({ identifier, password }) => {
