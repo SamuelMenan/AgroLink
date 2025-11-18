@@ -45,19 +45,37 @@ export function deriveUserFromTokens(resp: BackendAuthResponse): AuthUser | null
 
 type PostBody = Record<string, unknown>
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
-  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const text = await res.text();
-  if (!res.ok) {
-    // Intentar extraer mensaje estructurado de Supabase
+  const maxRetries = 3;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const json = JSON.parse(text);
-      const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
-      throw new Error(`Auth ${res.status}: ${detail}`);
-    } catch {
-      throw new Error(`Auth ${res.status}: ${text}`);
+      const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const text = await res.text();
+      if (!res.ok) {
+        // Reintentos rápidos para errores de gateway/cold start
+        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
+          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+          continue;
+        }
+        try {
+          const json = JSON.parse(text);
+          const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
+          throw new Error(`Auth ${res.status}: ${detail}`);
+        } catch {
+          throw new Error(`Auth ${res.status}: ${text}`);
+        }
+      }
+      return JSON.parse(text);
+    } catch (e) {
+      lastError = e;
+      // Reintentar en errores de red (fetch) no-HTTP
+      if (attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        continue;
+      }
     }
   }
-  return JSON.parse(text);
+  throw lastError instanceof Error ? lastError : new Error('Auth request failed');
 }
 
 const AUTH_PREFIX = '/api/v1/auth'; // centralizado para evitar duplicaciones y errores al versionar
