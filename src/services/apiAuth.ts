@@ -91,27 +91,22 @@ export async function refreshSession() {
 export function signOut() { clearTokens(); }
 
 // Determinar backend base URL
-// - En producción: usar siempre VITE_BACKEND_URL si está definida;
-//   si no, caer en window.location.origin para no generar rutas relativas.
-// - En desarrollo: VITE_BACKEND_URL o localhost:8080.
 const resolveBaseUrl = () => {
-  // Solo acceder a window en entorno browser
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const envBackend = import.meta.env.VITE_BACKEND_URL;
 
   if (import.meta.env.PROD) {
-    return import.meta.env.VITE_BACKEND_URL || origin;
+    const effective = envBackend || origin;
+    console.info('[apiAuth] ENV PROD. VITE_BACKEND_URL =', envBackend, 'origin =', origin, 'BASE_URL =', effective);
+    return effective;
   }
 
-  // Desarrollo
-  return import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+  const effective = envBackend || 'http://localhost:8080';
+  console.info('[apiAuth] ENV DEV. VITE_BACKEND_URL =', envBackend, 'BASE_URL =', effective);
+  return effective;
 };
 
 const BASE_URL = resolveBaseUrl();
 
-// Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend (solo en dev con proxy).
 export const getOAuthStartUrl = (provider: string, next: string) =>
-  `${BASE_URL}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
-
-// Endpoint mínimo para OAuth
-export const getOAuthStartUrlFallback = (provider: string, next: string) =>
   `${BASE_URL}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
