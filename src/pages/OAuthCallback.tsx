@@ -76,11 +76,22 @@ export default function OAuthCallback() {
       nextPath = rawNext.startsWith('/') ? rawNext : '/simple'
     }
 
-    // Limpia completamente hash y query del callback antes de navegar
+    // Logs de depuración y limpieza de URL
+    console.debug('[OAuthCallback] rawNext =', rawNext)
+    console.debug('[OAuthCallback] nextPath =', nextPath)
     try {
       window.history.replaceState(null, '', window.location.pathname)
-    } catch {
-      // ignore
+    } catch { /* ignore */ }
+
+    // Redirección forzada para eliminar la URL larga del historial
+    try {
+      if (nextPath && nextPath !== window.location.pathname) {
+        console.debug('[OAuthCallback] location.replace ->', nextPath)
+        window.location.replace(nextPath)
+        return
+      }
+    } catch (e) {
+      console.warn('[OAuthCallback] location.replace falló, fallback navigate()', e)
     }
 
     navigate(nextPath || '/simple', { replace: true })
