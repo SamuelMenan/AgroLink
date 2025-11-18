@@ -10,6 +10,42 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Bridge temprano: si venimos del flujo Supabase con tokens en el hash (#access_token=...)
+      // los guardamos en localStorage ANTES de montar React y limpiamos la URL.
+      (function() {
+        try {
+          var h = window.location.hash;
+          if (h && h.indexOf('access_token=') !== -1) {
+            var params = new URLSearchParams(h.startsWith('#') ? h.substring(1) : h);
+            var access = params.get('access_token');
+            var refresh = params.get('refresh_token');
+            if (access) {
+              localStorage.setItem('agrolink_access_token', access);
+            }
+            if (refresh) {
+              localStorage.setItem('agrolink_refresh_token', refresh);
+            }
+            // Determinar destino limpio basado en ?next= de la query
+            var searchParams = new URLSearchParams(window.location.search);
+            var rawNext = searchParams.get('next') || '/simple';
+            var nextPath = '/simple';
+            try {
+              if (rawNext.startsWith('/')) nextPath = rawNext; else nextPath = '/simple';
+              // Evitar bucles al callback
+              if (nextPath.startsWith('/oauth/callback')) nextPath = '/simple';
+            } catch {}
+            // Limpiar URL antes de redirigir
+            window.history.replaceState(null, '', window.location.pathname);
+            if (nextPath !== window.location.pathname) {
+              window.location.replace(nextPath);
+            }
+          }
+        } catch (e) {
+          console.warn('[hash-bridge] fallo procesando tokens antes de React', e);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
