@@ -113,6 +113,40 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
 
 const AUTH_PREFIX = '/api/v1/auth'; // centralizado para evitar duplicaciones y errores al versionar
 
+// Llamada directa a Supabase como último recurso para refrescar tokens.
+async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAuthResponse> {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+  const SUPABASE_URL: string | undefined = env.VITE_SUPABASE_URL;
+  const SUPABASE_ANON_KEY: string | undefined = env.VITE_SUPABASE_ANON_KEY;
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Supabase fallback not configured (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)');
+  }
+
+  const endpoint = `${SUPABASE_URL.replace(/\/+$/, '')}/auth/v1/token?grant_type=refresh_token`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ refresh_token }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const json = JSON.parse(text);
+      const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
+      throw new Error(`Supabase ${res.status}: ${detail}`);
+    } catch {
+      throw new Error(`Supabase ${res.status}: ${text}`);
+    }
+  }
+
+  return JSON.parse(text) as BackendAuthResponse;
+}
+
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-up`, { email, password, data: { full_name: fullName, phone } });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
@@ -134,9 +168,26 @@ export async function signInPhone(phone: string, password: string) {
 export async function refreshSession() {
   const rt = getRefreshToken();
   if (!rt) throw new Error('No refresh token');
-  const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
-  if (resp.access_token && resp.refresh_token) setTokens(resp);
-  return resp;
+  // Primero: intentar vía backend (directo/proxy con retry/backoff).
+  try {
+    const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
+    if (resp.access_token && resp.refresh_token) setTokens(resp);
+    return resp;
+  } catch (primaryErr) {
+    // Fallback final: invocar directamente a Supabase si se configuraron variables en frontend
+    try {
+      const supabaseResp = await supabaseRefreshFallback(rt);
+      if (supabaseResp.access_token && supabaseResp.refresh_token) setTokens(supabaseResp);
+      console.info('[apiAuth] refreshSession: usado fallback directo a Supabase');
+      return supabaseResp;
+    } catch (fallbackErr) {
+      // Si el fallback también falla, devolver el error original con detalle del fallback
+      const combined = new Error(
+        `Refresh failed via backend: ${(primaryErr as Error).message}. Fallback to Supabase failed: ${(fallbackErr as Error).message}`
+      );
+      throw combined;
+    }
+  }
 }
 
 export function signOut() { clearTokens(); }

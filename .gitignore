@@ -27,3 +27,4 @@ AgroLinkBackend/.env
 *.njsproj
 *.sln
 *.sw?
+.vercel

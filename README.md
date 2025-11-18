@@ -103,7 +103,7 @@ npm run preview
 
 ## ⚙️ Variables de entorno
 
-El frontend ya no requiere URL ni claves de Supabase. Todo acceso a base de datos y storage ocurre en el backend.
+El frontend no se conecta directamente a la base de datos; todo pasa por el backend. Sin embargo, existe un fallback opcional para refrescar tokens directamente con Supabase si el backend está frío o inaccesible temporalmente.
 
 Backend (Spring Boot) debe definir:
 ```bash
@@ -118,7 +118,19 @@ Notas:
 - `ENCRYPTION_KEY` habilita cifrado AES-GCM para mensajes (y futuros campos sensibles). Puede ser:
   - Hex de 64 caracteres (256-bit) o
   - Base64 de 32 bytes.
-- El frontend solo maneja tokens JWT emitidos por el backend (`/api/auth/*`).
+- El frontend maneja tokens JWT y llama al backend (`/api/v1/auth/*`).
+
+Frontend (opcional, solo para fallback de refresh):
+```bash
+# URL del proyecto Supabase y anon key (nunca el service key)
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon-key>
+```
+
+Notas del fallback:
+- El frontend intentará refrescar vía backend primero (directo y vía proxy con reintentos). Si ambas rutas fallan, usará el fallback directo a Supabase con `VITE_SUPABASE_ANON_KEY`.
+- Este fallback solo requiere la anon key y respeta CORS de Supabase. Si tu proyecto restringe orígenes, añade tu dominio de Vercel en Supabase.
+- Mantén `VITE_BACKEND_URL` apuntando al dominio del backend para la estrategia "direct-first".
 
 ## 🧩 Scripts disponibles
 
