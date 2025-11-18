@@ -90,9 +90,17 @@ export async function refreshSession() {
 
 export function signOut() { clearTokens(); }
 
-// Usar las env vars de Vite en vez de process.env (que es de Node)
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+// Determinar backend base URL
+// En producción (Vercel) DEBE venir de VITE_BACKEND_URL para no llamar al dominio de Vercel.
+const BASE_URL =
+  import.meta.env.PROD
+    ? import.meta.env.VITE_BACKEND_URL
+    : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080');
 
-// Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend.
+// Si backendBase está vacío usamos ruta relativa para que el proxy de Vite redirija al backend (solo en dev con proxy).
 export const getOAuthStartUrl = (provider: string, next: string) =>
+  `${BASE_URL}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+
+// Endpoint mínimo para OAuth
+export const getOAuthStartUrlFallback = (provider: string, next: string) =>
   `${BASE_URL}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
