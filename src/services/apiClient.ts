@@ -64,25 +64,24 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   const maxRetries = 5
   let lastError: unknown = null
-  let lastUrlTried = proxyUrl
+  let lastUrlTried = directUrl
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Primary attempt
-      const primary = prodProxyOnly ? proxyUrl : proxyUrl
+      // Primary attempt: direct backend (CORS permitido)
+      const primary = directUrl
       lastUrlTried = primary
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 6000)
-      // If proxy returns gateway/405 errors, try direct host as secondary within same attempt
+      // Si falla (405/5xx), intentar vía proxy same-origin dentro del mismo intento
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         try {
-          lastUrlTried = directUrl
-          res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 6000)
+          lastUrlTried = proxyUrl
+          res = await fetchWithTimeout(fetchImpl, proxyUrl, { ...init, headers }, 6000)
         } catch (e2) {
           lastError = e2
         }
       }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
-        // Warmup best-effort; then backoff and retry same endpoint
         await warmupBackend(fetchImpl, '', BASE_URL)
         await sleep(300 * (attempt + 1) * 2)
         continue
@@ -90,7 +89,6 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       return res
     } catch (e) {
       lastError = e
-      // Network error: in PROD proxy-only, retry same endpoint with backoff
       if (attempt < maxRetries - 1) {
         await warmupBackend(fetchImpl, '', BASE_URL)
         await sleep(300 * (attempt + 1) * 2)

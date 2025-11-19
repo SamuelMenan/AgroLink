@@ -72,14 +72,13 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   const maxRetries = 3;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    // try primary (proxy in PROD when cross-origin)
     try {
-      const primary = prodProxyOnly ? proxyUrl : proxyUrl;
-      let res = await fetchWithTimeout(primary, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000);
-      // On gateway/405 errors, try direct host even if cross-origin (backend CORS is configured)
+      // Primario: backend directo (CORS permitido)
+      let res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+      // Si falla (405/5xx), intentar vía proxy same-origin dentro del mismo intento
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         try {
-          res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+          res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
         } catch { /* ignore secondary network error */ }
       }
       const text = await res.text();
@@ -95,7 +94,6 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
       }
       return JSON.parse(text);
     } catch {
-      // On network error, retry primary only (proxy-only in PROD)
       lastError = new Error('Network error');
       if (attempt < maxRetries - 1) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
