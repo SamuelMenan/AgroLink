@@ -54,7 +54,8 @@ function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs
 
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
   // Compute URLs: proxy (relative, same-origin via Vercel rewrite), direct (absolute)
-  const proxyUrl = path;
+  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`);
+  const proxyUrl = proxiedPath;
   const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
