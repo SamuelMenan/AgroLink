@@ -52,15 +52,6 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   const proxyUrl = proxiedPath
 
   // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
-  const prodProxyOnly = (() => {
-    try {
-      if (import.meta.env.PROD && typeof window !== 'undefined') {
-        const base = new URL(BASE_URL)
-        return base.origin !== window.location.origin
-      }
-    } catch {}
-    return false
-  })()
 
   const maxRetries = 5
   let lastError: unknown = null

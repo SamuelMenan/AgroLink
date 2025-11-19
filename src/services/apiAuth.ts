@@ -59,15 +59,6 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
-  const prodProxyOnly = (() => {
-    try {
-      if (import.meta.env.PROD && typeof window !== 'undefined') {
-        const base = new URL(BASE_URL);
-        return base.origin !== window.location.origin;
-      }
-    } catch { /* ignore */ }
-    return false;
-  })();
 
   const maxRetries = 3;
   let lastError: unknown = null;
