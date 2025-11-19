@@ -60,9 +60,10 @@ async function warmupProxy() {
 }
 
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
-  // Compute URLs: proxy (relative, same-origin via Vercel rewrite), direct (absolute)
-  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`);
-  const proxyUrl = proxiedPath;
+  // Compute URLs: serverless (/api/*) stays same-origin; backend paths go via /api/proxy
+  const isServerless = path.startsWith('/api/')
+  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
+  const proxyUrl = isServerless ? path : proxiedPath
   const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
