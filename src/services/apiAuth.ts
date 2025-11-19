@@ -67,18 +67,18 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
 
-  const maxRetries = 4;
+  const maxRetries = 2;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // Primario: proxy same-origin
-      let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 10000)
+      let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
       // Si falla (405/5xx), intentar backend directo solo si es mismo origen
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         if (sameOrigin) {
           try {
-            res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 10000)
+            res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
           } catch { /* ignore secondary network error */ }
         }
       }
@@ -165,6 +165,7 @@ export async function refreshSession() {
   // Primero: intentar vía backend (directo/proxy con retry/backoff).
   try {
     await warmupProxy();
+    await new Promise(r => setTimeout(r, 500));
     const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     return resp;
