@@ -54,9 +54,26 @@ export default async function handler(req, res) {
         if (attempt < 2) await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
       }
     }
-    if (!resp) {
-      res.status(502).json({ ok: false, error: (lastErr && lastErr.message) || 'fetch failed' })
-      return
+    if (!resp || (resp.status >= 500 && resp.status <= 599)) {
+      const base = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
+      const beUrl = `${base.replace(/\/$/, '')}/api/v1/messages?conversationId=${encodeURIComponent(conversationId)}`
+      try {
+        const be = await fetch(beUrl, { headers, signal: controller.signal })
+        res.status(be.status)
+        be.headers.forEach((v, k) => {
+          const key = k.toLowerCase()
+          if (!['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailer','transfer-encoding','upgrade','host','content-encoding','content-length'].includes(key)) {
+            try { res.setHeader(k, v) } catch {}
+          }
+        })
+        if (!res.getHeader('content-type')) { try { res.setHeader('content-type', 'application/json') } catch {} }
+        const buf = Buffer.from(await be.arrayBuffer())
+        res.end(buf)
+        return
+      } catch (e) {
+        res.status(502).json({ ok: false, error: (e && e.message) || (lastErr && lastErr.message) || 'fetch failed' })
+        return
+      }
     }
     res.status(resp.status)
     resp.headers.forEach((v, k) => {
