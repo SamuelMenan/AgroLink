@@ -43,58 +43,39 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   const directUrl = `${BASE_URL}${path}`
   const proxyUrl = path // same-origin (Vercel rewrite in prod)
 
-  // Prefer proxy first in PROD when origins differ to avoid noisy CORS errors.
-  let first = directUrl
-  let second = proxyUrl
-  try {
-    const base = new URL(BASE_URL)
-    if (import.meta.env.PROD && typeof window !== 'undefined') {
-      if (base.origin !== window.location.origin) {
-        first = proxyUrl
-        second = directUrl
+  // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
+  const prodProxyOnly = (() => {
+    try {
+      if (import.meta.env.PROD && typeof window !== 'undefined') {
+        const base = new URL(BASE_URL)
+        return base.origin !== window.location.origin
       }
-    }
-  } catch { /* ignore URL parse */ }
+    } catch {}
+    return false
+  })()
 
   const maxRetries = 5
   let lastError: unknown = null
-  let lastUrlTried = first
+  let lastUrlTried = proxyUrl
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Try first URL
-      lastUrlTried = first
-      let res = await fetchImpl(first, { ...init, headers })
-      // If gateway error, try second URL within same attempt
-      if (!res.ok && [502, 503, 504].includes(res.status)) {
-        await sleep(150)
-        lastUrlTried = second
-        res = await fetchImpl(second, { ...init, headers })
-      }
+      // Primary attempt
+      const primary = prodProxyOnly ? proxyUrl : proxyUrl
+      lastUrlTried = primary
+      let res = await fetchImpl(primary, { ...init, headers })
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
-        await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
+        // Warmup best-effort; then backoff and retry same endpoint
+        await warmupBackend(fetchImpl, '', BASE_URL)
         await sleep(300 * (attempt + 1) * 2)
         continue
       }
       return res
     } catch (e) {
       lastError = e
-      // Network/CORS error: try the other URL once in this attempt
-      try {
-        lastUrlTried = second
-        const res2 = await fetchImpl(second, { ...init, headers })
-        if (!res2.ok && [502, 503, 504].includes(res2.status) && attempt < maxRetries - 1) {
-          await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
-          await sleep(300 * (attempt + 1) * 2)
-          continue
-        }
-        return res2
-      } catch (e2) {
-        lastError = e2
-        lastUrlTried = second
-      }
+      // Network error: in PROD proxy-only, retry same endpoint with backoff
       if (attempt < maxRetries - 1) {
-        await warmupBackend(fetchImpl, BASE_URL.startsWith('http') ? '' : '', BASE_URL)
+        await warmupBackend(fetchImpl, '', BASE_URL)
         await sleep(300 * (attempt + 1) * 2)
         continue
       }

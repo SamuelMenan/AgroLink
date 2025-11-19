@@ -45,40 +45,31 @@ export function deriveUserFromTokens(resp: BackendAuthResponse): AuthUser | null
 
 type PostBody = Record<string, unknown>
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
-  // Compute both URLs: proxy (relative, goes through Vercel rewrite) and direct (absolute to backend host)
-  const proxyUrl = path; // relative path -> same-origin in prod
-  const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
+  // Compute URLs: proxy (relative, same-origin via Vercel rewrite), direct (absolute)
+  const proxyUrl = path;
+  // const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
 
-  // Decide attempt order: in PROD, prefer proxy first when origins differ
-  let first = directUrl;
-  let second = proxyUrl;
-  try {
-    if (import.meta.env.PROD && typeof window !== 'undefined') {
-      const base = new URL(BASE_URL);
-      if (base.origin !== window.location.origin) {
-        first = proxyUrl;
-        second = directUrl;
+  // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
+  const prodProxyOnly = (() => {
+    try {
+      if (import.meta.env.PROD && typeof window !== 'undefined') {
+        const base = new URL(BASE_URL);
+        return base.origin !== window.location.origin;
       }
-    }
-  } catch { /* ignore URL parse */ }
+    } catch { /* ignore */ }
+    return false;
+  })();
 
   const maxRetries = 3;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    // try first
+    // try primary (proxy in PROD when cross-origin)
     try {
-      let res = await fetch(first, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!res.ok && [502, 503, 504].includes(res.status)) {
-        // brief wait then try second within same attempt
-        await new Promise(r => setTimeout(r, 150));
-        res = await fetch(second, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      }
+      const primary = prodProxyOnly ? proxyUrl : proxyUrl;
+      const res = await fetch(primary, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const text = await res.text();
       if (!res.ok) {
-        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
-          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-          continue;
-        }
+        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 400 * (attempt + 1))); continue; }
         try {
           const json = JSON.parse(text);
           const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
@@ -89,25 +80,8 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
       }
       return JSON.parse(text);
     } catch {
-      // On network error, try the other URL once
-      try {
-        const res = await fetch(second, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const text = await res.text();
-        if (res.ok) return JSON.parse(text);
-        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
-          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-          continue;
-        }
-        try {
-          const json = JSON.parse(text);
-          const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
-          throw new Error(`Auth ${res.status}: ${detail}`);
-        } catch {
-          throw new Error(`Auth ${res.status}: ${text}`);
-        }
-      } catch (e2) {
-        lastError = e2;
-      }
+      // On network error, retry primary only (proxy-only in PROD)
+      lastError = new Error('Network error');
       if (attempt < maxRetries - 1) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
         continue;
