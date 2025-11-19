@@ -60,7 +60,13 @@ export default async function handler(req, res) {
       return
     }
     res.status(resp.status)
-    resp.headers.forEach((v, k) => { if (!['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailer','transfer-encoding','upgrade','host'].includes(k.toLowerCase())) { try { res.setHeader(k, v) } catch {} } })
+    resp.headers.forEach((v, k) => {
+      const key = k.toLowerCase()
+      if (!['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailer','transfer-encoding','upgrade','host','content-encoding','content-length'].includes(key)) {
+        try { res.setHeader(k, v) } catch {}
+      }
+    })
+    if (!res.getHeader('content-type')) { try { res.setHeader('content-type', 'application/json') } catch {} }
     const buf = Buffer.from(await resp.arrayBuffer())
     res.end(buf)
   } finally {
