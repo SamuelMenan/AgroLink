@@ -37,6 +37,7 @@ export default async function handler(req, res) {
     const chunks = []
     for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
     const body = Buffer.concat(chunks)
+    const bodyJson = body.length ? (() => { try { return JSON.parse(body.toString('utf8')) } catch { return {} } })() : {}
     if (body.length && !out.has('content-length')) out.set('content-length', String(body.length))
 
     let resp
@@ -51,7 +52,22 @@ export default async function handler(req, res) {
         if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)))
       }
     }
-    if (!resp) {
+    if (!resp || (resp.status >= 500 && resp.status <= 599)) {
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+      const supabaseAnon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+      if (supabaseUrl && supabaseAnon) {
+        const endpoint = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=refresh_token`
+        const sb = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'accept': 'application/json', 'apikey': supabaseAnon, 'Authorization': `Bearer ${supabaseAnon}` },
+          body: JSON.stringify({ refresh_token: bodyJson.refresh_token })
+        })
+        const text = await sb.text()
+        res.status(sb.ok ? sb.status : 502)
+        res.setHeader('content-type', 'application/json')
+        res.end(text)
+        return
+      }
       res.status(502).json({ ok: false, error: (err && err.message) || 'fetch failed' })
       return
     }
