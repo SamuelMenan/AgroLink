@@ -166,7 +166,7 @@ export async function refreshSession() {
   try {
     await warmupProxy();
     await new Promise(r => setTimeout(r, 500));
-    const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
+    const resp = await post(`/api/refresh`, { refresh_token: rt });
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     return resp;
   } catch (primaryErr) {
