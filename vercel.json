@@ -1,6 +1,7 @@
 {
   "version": 2,
   "rewrites": [
+    { "source": "/api/proxy/api/v1/notifications/by-user/(.*)", "destination": "/api/notifications/by-user?user_id=$1" },
     { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" },
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*\\.(?:js|css|png|jpg|svg|json|map|ico))", "destination": "/$1" },
