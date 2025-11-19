@@ -45,63 +45,69 @@ export function deriveUserFromTokens(resp: BackendAuthResponse): AuthUser | null
 
 type PostBody = Record<string, unknown>
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
-  // Primary: call backend host directly; Fallback: same-origin (Vercel rewrite)
-  const primaryUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
-  const fallbackUrl = path; // relative -> goes via Vercel proxy in prod
+  // Compute both URLs: proxy (relative, goes through Vercel rewrite) and direct (absolute to backend host)
+  const proxyUrl = path; // relative path -> same-origin in prod
+  const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
+
+  // Decide attempt order: in PROD, prefer proxy first when origins differ
+  let first = directUrl;
+  let second = proxyUrl;
+  try {
+    if (import.meta.env.PROD && typeof window !== 'undefined') {
+      const base = new URL(BASE_URL);
+      if (base.origin !== window.location.origin) {
+        first = proxyUrl;
+        second = directUrl;
+      }
+    }
+  } catch { /* ignore URL parse */ }
+
   const maxRetries = 3;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // try first
     try {
-      let res = await fetch(primaryUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      // If CORS/proxy/cold-start fails, try fallback once per attempt in PROD
-      if (!res.ok && import.meta.env.PROD && !/^https?:\/\//i.test(path)) {
-        if ([502, 503, 504].includes(res.status)) {
-          // brief wait before trying fallback
-          await new Promise(r => setTimeout(r, 150));
-          res = await fetch(fallbackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        }
+      let res = await fetch(first, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok && [502, 503, 504].includes(res.status)) {
+        // brief wait then try second within same attempt
+        await new Promise(r => setTimeout(r, 150));
+        res = await fetch(second, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       }
       const text = await res.text();
       if (!res.ok) {
-        // Reintentos rápidos para errores de gateway/cold start
         if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
           await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
           continue;
         }
         try {
           const json = JSON.parse(text);
-          const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
+          const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
           throw new Error(`Auth ${res.status}: ${detail}`);
         } catch {
           throw new Error(`Auth ${res.status}: ${text}`);
         }
       }
       return JSON.parse(text);
-    } catch (e) {
-      // Network/CORS error before getting a Response
-      if (import.meta.env.PROD && !/^https?:\/\//i.test(path)) {
-        try {
-          const res = await fetch(fallbackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-          const text = await res.text();
-          if (res.ok) return JSON.parse(text);
-          if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
-            await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-            continue;
-          }
-          try {
-            const json = JSON.parse(text);
-            const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
-            throw new Error(`Auth ${res.status}: ${detail}`);
-          } catch {
-            throw new Error(`Auth ${res.status}: ${text}`);
-          }
-        } catch (fallbackErr) {
-          lastError = fallbackErr;
+    } catch {
+      // On network error, try the other URL once
+      try {
+        const res = await fetch(second, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const text = await res.text();
+        if (res.ok) return JSON.parse(text);
+        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
+          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+          continue;
         }
-      } else {
-        lastError = e;
+        try {
+          const json = JSON.parse(text);
+          const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
+          throw new Error(`Auth ${res.status}: ${detail}`);
+        } catch {
+          throw new Error(`Auth ${res.status}: ${text}`);
+        }
+      } catch (e2) {
+        lastError = e2;
       }
-      // Reintentar en errores de red
       if (attempt < maxRetries - 1) {
         await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
         continue;

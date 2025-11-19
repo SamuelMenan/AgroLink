@@ -2,6 +2,7 @@
 // Usage (PowerShell): $Env:API_BASE='http://localhost:8080/api'; node scripts/smoke.mjs
 
 let API = process.env.API_BASE || 'http://localhost:8080/api';
+const ORIGIN = process.env.ORIGIN || '';
 // Fallback support: if endpoints 404 and base ends with /api, retry without /api.
 
 async function req(method, path, body, token, allow503 = true) {
@@ -44,6 +45,24 @@ async function req(method, path, body, token, allow503 = true) {
 
 async function main() {
   console.log('--- Smoke test start ---');
+  if (ORIGIN) {
+    try {
+      const preflight = await fetch(API + '/auth/refresh', {
+        method: 'OPTIONS',
+        headers: {
+          'Origin': ORIGIN,
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'content-type'
+        }
+      });
+      console.log('Preflight /auth/refresh status:', preflight.status,
+        'ACAO=', preflight.headers.get('access-control-allow-origin'),
+        'ACAC=', preflight.headers.get('access-control-allow-credentials'),
+        'Vary=', preflight.headers.get('vary'));
+    } catch (e) {
+      console.warn('Preflight check failed:', e.message);
+    }
+  }
   // AUTH sign-up
   const email = `smoke_${Date.now()}@test.local`;
   const password = 'Smoke123!';
