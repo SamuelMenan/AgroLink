@@ -52,6 +52,13 @@ function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs
   return fetch(input, merged).finally(() => clearTimeout(id))
 }
 
+async function warmupProxy() {
+  try {
+    await fetch('/api/proxy/actuator/health', { cache: 'no-store' })
+    await new Promise(r => setTimeout(r, 200))
+  } catch { /* ignore */ }
+}
+
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
   // Compute URLs: proxy (relative, same-origin via Vercel rewrite), direct (absolute)
   const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`);
@@ -157,6 +164,7 @@ export async function refreshSession() {
   if (!rt) throw new Error('No refresh token');
   // Primero: intentar vía backend (directo/proxy con retry/backoff).
   try {
+    await warmupProxy();
     const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     return resp;
