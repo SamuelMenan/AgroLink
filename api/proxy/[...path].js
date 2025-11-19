@@ -9,7 +9,11 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 export default async function handler(req, res) {
   const base = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
   const path = Array.isArray(req.query.path) ? req.query.path.join('/') : (req.query.path || '')
-  const url = `${base.replace(/\/$/, '')}/${path}`
+  const urlObj = new URL(req.url, 'http://localhost')
+  const sp = urlObj.searchParams
+  sp.delete('path')
+  const qs = sp.toString()
+  const url = `${base.replace(/\/$/, '')}/${path}${qs ? `?${qs}` : ''}`
 
   const method = req.method || 'GET'
   const outgoingHeaders = new Headers()
@@ -29,10 +33,17 @@ export default async function handler(req, res) {
     const controller = new AbortController()
     const id = setTimeout(() => controller.abort(), 8000)
     try {
+      let body
+      if (!['GET','HEAD'].includes(method.toUpperCase())) {
+        const chunks = []
+        for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        body = Buffer.concat(chunks)
+        if (body.length && !outgoingHeaders.has('content-length')) outgoingHeaders.set('content-length', String(body.length))
+      }
       const resp = await fetch(url, {
         method,
         headers: outgoingHeaders,
-        body: ['GET','HEAD'].includes(method.toUpperCase()) ? undefined : req,
+        body,
         signal: controller.signal,
       })
       return resp
