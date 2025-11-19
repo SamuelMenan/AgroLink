@@ -15,6 +15,9 @@ export default async function handler(req, res) {
 
   const base = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
   const url = `${base.replace(/\/$/, '')}/api/v1/auth/refresh`
+  const health = `${base.replace(/\/$/, '')}/actuator/health`
+  try { await fetch(health, { cache: 'no-store' }) } catch {}
+  await new Promise(r => setTimeout(r, 250))
 
   const HOP = new Set(['connection','keep-alive','proxy-authenticate','proxy-authorization','te','trailer','transfer-encoding','upgrade','host'])
   const out = new Headers()
@@ -38,14 +41,14 @@ export default async function handler(req, res) {
 
     let resp
     let err
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         resp = await fetch(url, { method: 'POST', headers: out, body, signal: controller.signal })
         if (![502,503,504].includes(resp.status)) break
-        await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
+        await new Promise(r => setTimeout(r, 400 * (attempt + 1)))
       } catch (e) {
         err = e
-        if (attempt < 1) await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
+        if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)))
       }
     }
     if (!resp) {
