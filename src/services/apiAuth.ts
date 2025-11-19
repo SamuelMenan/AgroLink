@@ -64,12 +64,12 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Primario: backend directo (CORS permitido)
-      let res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
-      // Si falla (405/5xx), intentar vía proxy same-origin dentro del mismo intento
+      // Primario: proxy same-origin
+      let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+      // Si falla (405/5xx), intentar backend directo dentro del mismo intento
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         try {
-          res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+          res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
         } catch { /* ignore secondary network error */ }
       }
       const text = await res.text();

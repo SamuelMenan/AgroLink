@@ -59,15 +59,15 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Primary attempt: direct backend (CORS permitido)
-      const primary = directUrl
+      // Primary attempt: proxy same-origin
+      const primary = proxyUrl
       lastUrlTried = primary
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 6000)
-      // Si falla (405/5xx), intentar vía proxy same-origin dentro del mismo intento
+      // Si falla (405/5xx), intentar directo al backend dentro del mismo intento
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         try {
-          lastUrlTried = proxyUrl
-          res = await fetchWithTimeout(fetchImpl, proxyUrl, { ...init, headers }, 6000)
+          lastUrlTried = directUrl
+          res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 6000)
         } catch (e2) {
           lastError = e2
         }
