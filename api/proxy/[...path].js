@@ -15,12 +15,10 @@ export default async function handler(req, res) {
     return
   }
   const base = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
-  const path = Array.isArray(req.query.path) ? req.query.path.join('/') : (req.query.path || '')
   const urlObj = new URL(req.url, 'http://localhost')
-  const sp = urlObj.searchParams
-  sp.delete('path')
-  const qs = sp.toString()
-  const url = `${base.replace(/\/$/, '')}/${path}${qs ? `?${qs}` : ''}`
+  const pathname = urlObj.pathname.replace(/^\/api\/proxy\/?/, '')
+  const qs = urlObj.searchParams.toString()
+  const url = `${base.replace(/\/$/, '')}/${pathname}${qs ? `?${qs}` : ''}`
 
   const method = req.method || 'GET'
   const outgoingHeaders = new Headers()
