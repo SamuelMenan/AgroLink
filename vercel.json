@@ -1,6 +1,7 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" }
+    { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
