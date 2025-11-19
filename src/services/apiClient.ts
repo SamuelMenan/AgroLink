@@ -71,8 +71,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       const primary = prodProxyOnly ? proxyUrl : proxyUrl
       lastUrlTried = primary
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 6000)
-      // If gateway error/timeouts, try direct host as secondary within same attempt
-      if (!res.ok && [502, 503, 504].includes(res.status)) {
+      // If gateway error/timeouts, optionally try direct host as secondary within same attempt
+      if (!res.ok && [502, 503, 504].includes(res.status) && !prodProxyOnly) {
         try {
           lastUrlTried = directUrl
           res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 6000)

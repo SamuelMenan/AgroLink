@@ -75,8 +75,8 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
     try {
       const primary = prodProxyOnly ? proxyUrl : proxyUrl;
       let res = await fetchWithTimeout(primary, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000);
-      // On gateway errors, immediately try direct host within same attempt
-      if (!res.ok && [502, 503, 504].includes(res.status)) {
+      // On gateway errors, optionally try direct host within same attempt (only when not cross-origin)
+      if (!res.ok && [502, 503, 504].includes(res.status) && !prodProxyOnly) {
         try {
           res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
         } catch { /* ignore secondary network error */ }
