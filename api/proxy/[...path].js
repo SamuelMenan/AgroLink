@@ -7,6 +7,13 @@ const HOP_BY_HOP = new Set([
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 export default async function handler(req, res) {
+  if ((req.method || 'GET').toUpperCase() === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*')
+    res.status(204).end()
+    return
+  }
   const base = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
   const path = Array.isArray(req.query.path) ? req.query.path.join('/') : (req.query.path || '')
   const urlObj = new URL(req.url, 'http://localhost')
