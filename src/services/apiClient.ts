@@ -40,7 +40,6 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const directUrl = `${BASE_URL}${path}`
   const proxyUrl = path // same-origin (Vercel rewrite in prod)
 
   // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
