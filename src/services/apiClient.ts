@@ -18,6 +18,13 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+function fetchWithTimeout(fetchImpl: FetchLike, input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeoutMs)
+  const merged: RequestInit = { ...init, signal: controller.signal }
+  return fetchImpl(input, merged).finally(() => clearTimeout(id))
+}
+
 async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string, directUrlBase: string) {
   // Best effort: ping health endpoints to wake Render. Ignore errors.
   try {
@@ -40,6 +47,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     headers.set('Authorization', `Bearer ${token}`)
   }
 
+  const directUrl = `${BASE_URL}${path}`
   const proxyUrl = path // same-origin (Vercel rewrite in prod)
 
   // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
@@ -62,7 +70,16 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       // Primary attempt
       const primary = prodProxyOnly ? proxyUrl : proxyUrl
       lastUrlTried = primary
-      let res = await fetchImpl(primary, { ...init, headers })
+      let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 6000)
+      // If gateway error/timeouts, try direct host as secondary within same attempt
+      if (!res.ok && [502, 503, 504].includes(res.status)) {
+        try {
+          lastUrlTried = directUrl
+          res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 6000)
+        } catch (e2) {
+          lastError = e2
+        }
+      }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
         // Warmup best-effort; then backoff and retry same endpoint
         await warmupBackend(fetchImpl, '', BASE_URL)

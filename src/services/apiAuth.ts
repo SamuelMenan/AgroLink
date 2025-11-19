@@ -44,10 +44,18 @@ export function deriveUserFromTokens(resp: BackendAuthResponse): AuthUser | null
 }
 
 type PostBody = Record<string, unknown>
+
+function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), timeoutMs)
+  const merged: RequestInit = { ...init, signal: controller.signal }
+  return fetch(input, merged).finally(() => clearTimeout(id))
+}
+
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
   // Compute URLs: proxy (relative, same-origin via Vercel rewrite), direct (absolute)
   const proxyUrl = path;
-  // const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
+  const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
   const prodProxyOnly = (() => {
@@ -66,7 +74,13 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
     // try primary (proxy in PROD when cross-origin)
     try {
       const primary = prodProxyOnly ? proxyUrl : proxyUrl;
-      const res = await fetch(primary, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      let res = await fetchWithTimeout(primary, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000);
+      // On gateway errors, immediately try direct host within same attempt
+      if (!res.ok && [502, 503, 504].includes(res.status)) {
+        try {
+          res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+        } catch { /* ignore secondary network error */ }
+      }
       const text = await res.text();
       if (!res.ok) {
         if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 400 * (attempt + 1))); continue; }
