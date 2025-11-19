@@ -60,18 +60,18 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
 
-  const maxRetries = 3;
+  const maxRetries = 4;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // Primario: proxy same-origin
-      let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+      let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 10000)
       // Si falla (405/5xx), intentar backend directo solo si es mismo origen
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         if (sameOrigin) {
           try {
-            res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 6000)
+            res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, 10000)
           } catch { /* ignore secondary network error */ }
         }
       }
