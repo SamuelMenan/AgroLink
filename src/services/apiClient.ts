@@ -48,7 +48,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   }
 
   const directUrl = `${BASE_URL}${path}`
-  const proxiedPath = path.startsWith('/api/proxy') ? path : `/api/proxy${path.startsWith('/') ? '' : '/'}${path.replace(/^\/+/, '')}`
+  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
   const proxyUrl = proxiedPath
 
   // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
