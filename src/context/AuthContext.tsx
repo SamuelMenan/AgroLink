@@ -64,11 +64,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
 /**
- * Registra un nuevo usuario por email.
+ * Registra un nuevo usuario por email o teléfono.
  * 
  * IMPORTANTE: Requiere que la confirmación de email esté desactivada en la configuración de Supabase.
  * Si no se desactiva, el sistema mostrará warnings en consola y el acceso será limitado
  * cuando no se reciban tokens de autenticación.
+ * 
+ * @param fullName - Nombre completo del usuario
+ * @param email - Email del usuario (opcional si se proporciona teléfono)
+ * @param password - Contraseña del usuario
+ * @param phone - Teléfono del usuario (opcional si se proporciona email)
  */
   const signUpWithEmail: AuthContextValue['signUpWithEmail'] = async ({ fullName, email, password, phone }) => {
     try {

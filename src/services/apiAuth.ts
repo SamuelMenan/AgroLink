@@ -73,7 +73,16 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // Primario: proxy same-origin
-      let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
+      let res = await fetchWithTimeout(proxyUrl, { 
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Accept': 'application/json',
+          'X-Attempt': String(attempt + 1),
+          'X-Request-Type': 'proxy'
+        }, 
+        body: JSON.stringify(body) 
+      }, 8000) // Increased timeout to 8s
       // Si falla (405/5xx), intentar backend directo
       if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
         console.warn(`[apiAuth] Proxy failed with ${res.status}, attempting direct backend`, {
@@ -89,21 +98,44 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
         
         if (shouldAttemptDirect) {
           try {
-            console.log(`[apiAuth] Attempting direct fetch to: ${directUrl}`)
-            const directRes = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
-            console.log(`[apiAuth] Direct fetch result: ${directRes.status}`)
-            // Use the direct response if it succeeds
-            if (directRes.ok) {
+            console.log(`[apiAuth] Attempting direct fetch to: ${directUrl} (attempt ${attempt + 1})`)
+            const directRes = await fetchWithTimeout(directUrl, { 
+              method: 'POST', 
+              headers: { 
+                'Content-Type': 'application/json', 
+                'Accept': 'application/json',
+                'X-Attempt': String(attempt + 1),
+                'X-Request-Type': 'direct',
+                'X-Direct-Request': 'true'
+              }, 
+              body: JSON.stringify(body) 
+            }, 10000) // Increased timeout to 10s for direct requests
+            console.log(`[apiAuth] Direct fetch result: ${directRes.status} (attempt ${attempt + 1})`)
+            // Use the direct response if it succeeds or returns a client error (4xx)
+            if (directRes.ok || (directRes.status >= 400 && directRes.status < 500)) {
               res = directRes
             }
           } catch (directError) {
-            console.error('[apiAuth] Direct fetch failed:', directError)
-            // Check if it's a CORS error
-            if (directError instanceof Error && directError.message.includes('CORS')) {
-              console.warn('[apiAuth] CORS error detected on direct fetch - this is expected for cross-origin requests')
-              // Don't treat CORS errors as complete failures - the backend might still be reachable via other means
+            console.error(`[apiAuth] Direct fetch failed (attempt ${attempt + 1}):`, directError)
+            
+            // Handle specific error types
+            if (directError instanceof Error) {
+              if (directError.name === 'AbortError') {
+                console.warn(`[apiAuth] Request aborted (attempt ${attempt + 1}) - timeout or user cancellation`)
+              } else if (directError.message.includes('CORS')) {
+                console.warn(`[apiAuth] CORS error detected on direct fetch (attempt ${attempt + 1}) - expected for cross-origin`)
+              } else if (directError.message.includes('Network')) {
+                console.warn(`[apiAuth] Network error on direct fetch (attempt ${attempt + 1})`)
+              }
             }
-            // Continue with original error
+            
+            // On last attempt, throw the direct error if we can't use the proxy response
+            if (attempt === maxRetries - 1) {
+              throw directError;
+            }
+            
+            // Continue with original error for non-last attempts
+            console.warn(`[apiAuth] Continuing with proxy response due to direct fetch failure (attempt ${attempt + 1})`)
           }
         } else {
           console.warn('[apiAuth] Skipping direct fetch - cross-origin detected and not a 405 error')
@@ -111,28 +143,57 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
       }
       const text = await res.text();
       if (!res.ok) {
+        // For client errors (4xx), don't retry - propagate the error
+        if (res.status >= 400 && res.status < 500) {
+          try {
+            const json = JSON.parse(text);
+            const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
+            throw new Error(`Auth ${res.status}: ${detail}`);
+          } catch {
+            throw new Error(`Auth ${res.status}: ${text}`);
+          }
+        }
+        
+        // For server errors (5xx), throw to trigger retry
         if ([405, 502, 503, 504].includes(res.status) && attempt < maxRetries - 1) { 
           console.log(`[apiAuth] Retry ${attempt + 1}/${maxRetries} after ${res.status} error`)
-          await new Promise(r => setTimeout(r, 400 * (attempt + 1))); 
-          continue; 
+          throw new Error(`Server error ${res.status}: ${text}`);
         }
-        try {
-          const json = JSON.parse(text);
-          const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
-          throw new Error(`Auth ${res.status}: ${detail}`);
-        } catch {
-          throw new Error(`Auth ${res.status}: ${text}`);
-        }
+        
+        throw new Error(`Server error ${res.status}: ${text}`);
       }
+      
       return JSON.parse(text);
-    } catch {
-      lastError = new Error('Network error');
-      if (attempt < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
-        continue;
+      
+    } catch (err) {
+      lastError = err;
+      const isLastAttempt = attempt === maxRetries - 1;
+      
+      if (isLastAttempt) {
+        console.error(`[apiAuth] Final attempt failed for ${path}:`, err);
+        
+        // Provide more specific error messages
+        if (err instanceof Error) {
+          if (err.name === 'AbortError') {
+            throw new Error('La solicitud tardó demasiado tiempo. Por favor, intenta nuevamente.');
+          }
+          if (err.message.includes('Network')) {
+            throw new Error('Error de red. Por favor, verifica tu conexión a internet.');
+          }
+          if (err.message.includes('CORS')) {
+            throw new Error('Error de conexión con el servidor. Por favor, intenta nuevamente en unos momentos.');
+          }
+        }
+        
+        throw err;
       }
+      
+      const delay = 500 * (attempt + 1); // Increased delay
+      console.warn(`[apiAuth] Attempt ${attempt + 1} failed for ${path}, retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
     }
   }
+  
   throw lastError instanceof Error ? lastError : new Error('Auth request failed');
 }
 
@@ -173,7 +234,18 @@ async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAu
 }
 
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
-  const resp = await post(`${AUTH_PREFIX}/sign-up`, { email, password, data: { full_name: fullName, phone } });
+  // Support phone-only registration - backend will generate email if needed
+  const payload: any = { password, data: { full_name: fullName } };
+  
+  if (email && email.trim()) {
+    payload.email = email;
+  }
+  
+  if (phone && phone.trim()) {
+    payload.phone = phone;
+  }
+  
+  const resp = await post(`${AUTH_PREFIX}/sign-up`, payload);
   if (resp.access_token && resp.refresh_token) setTokens(resp);
   try { await warmupProxy(); } catch {
     // Silently ignore warmup errors during sign up

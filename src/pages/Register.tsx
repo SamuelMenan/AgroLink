@@ -40,14 +40,19 @@ export default function Register() {
     if (!form.fullName.trim()) e.fullName = 'El nombre completo es obligatorio.'
     else if (form.fullName.trim().length > 50) e.fullName = 'Máximo 50 caracteres.'
 
-  // Email: no vacío + formato básico (permitir cualquier TLD válido de 2+ caracteres)
+  // Email: opcional, pero si se proporciona debe tener formato válido
     const email = form.email.trim()
-    if (!email) e.email = 'El correo es obligatorio.'
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) e.email = 'Correo inválido.'
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) e.email = 'Correo inválido.'
 
-    // Teléfono: numérico, máx 10 dígitos (opcional si defines email como principal)
+    // Teléfono: numérico, máx 10 dígitos (ahora puede ser principal)
     if (form.phone) {
       if (!/^\d{1,10}$/.test(form.phone)) e.phone = 'Solo números, máximo 10 dígitos.'
+    }
+    
+    // Validar que al menos email o teléfono estén proporcionados
+    if (!email && !form.phone) {
+      e.email = 'Debes proporcionar un correo electrónico o número de teléfono.'
+      e.phone = 'Debes proporcionar un correo electrónico o número de teléfono.'
     }
 
     // Contraseña: 8+ una mayúscula, un número y un símbolo
@@ -108,13 +113,13 @@ export default function Register() {
           {errors.fullName && <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Correo electrónico</label>
+          <label className="block text-sm font-medium text-gray-700">Correo electrónico (opcional)</label>
           <input name="email" value={form.email} onChange={onChange} type="email" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
           {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Número de teléfono (opcional)</label>
-          <input name="phone" value={form.phone} onChange={onChange} inputMode="numeric" pattern="[0-9]*" maxLength={10} className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="phone" value={form.phone} onChange={onChange} inputMode="numeric" pattern="[0-9]*" maxLength={10} autoComplete="username" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
           {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
         </div>
         <div>
