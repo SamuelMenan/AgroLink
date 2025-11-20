@@ -1,5 +1,6 @@
 import { decryptText, encryptText, exportKeyBase64, generateConversationKey, getStoredKey, importKeyBase64, storeKey } from '../utils/crypto'
 import { apiFetch } from './apiClient'
+import { offlineQueue, startOfflineRetry, stopOfflineRetry } from './offlineQueue'
 
 // Servicio de mensajería backend-only. Realtime y recibos se implementarán más adelante vía WebSocket/SSE.
 
@@ -87,6 +88,15 @@ export async function ensureConversationWith(userId: string, otherUserId: string
         return // Success
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error')
+        
+        // If it's a circuit breaker error or persistent 502, queue the participant
+        if ((lastError.message.includes('Circuit breaker') || lastError.message.includes('Service temporarily unavailable') || lastError.message.includes('502')) && attempt === maxRetries) {
+          console.warn(`[addParticipant] Queuing participant ${uid} due to service unavailability`)
+          offlineQueue.addParticipant(selected.id, uid)
+          startOfflineRetry(processOfflineQueue)
+          return // Don't throw, just queue it
+        }
+        
         if (attempt === maxRetries) {
           console.error(`[addParticipant] Failed after ${maxRetries} attempts:`, lastError)
           throw lastError
@@ -271,6 +281,27 @@ export async function sendMessage(conversationId: string, senderId: string, text
       }
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error')
+      
+      // If it's a circuit breaker error or server unavailable, queue the message
+      if (lastError.message.includes('Circuit breaker') || lastError.message.includes('Service temporarily unavailable')) {
+        console.warn('[sendMessage] Queuing message due to service unavailability')
+        offlineQueue.addMessage(conversationId, senderId, text, mime)
+        
+        // Start offline retry mechanism if not already running
+        startOfflineRetry(processOfflineQueue)
+        
+        // Show user-friendly message
+        throw new Error('Tu mensaje se guardó localmente y se enviará cuando el servidor esté disponible')
+      }
+      
+      // Check if it's a persistent 502 error
+      if (lastError.message.includes('502') && attempt === maxRetries) {
+        console.warn('[sendMessage] Persistent 502 error, queuing message')
+        offlineQueue.addMessage(conversationId, senderId, text, mime)
+        startOfflineRetry(processOfflineQueue)
+        throw new Error('Tu mensaje se guardó localmente y se enviará cuando el servidor esté disponible')
+      }
+      
       if (attempt === maxRetries) {
         console.error(`[sendMessage] Failed after ${maxRetries} attempts:`, lastError)
         throw lastError
@@ -279,6 +310,74 @@ export async function sendMessage(conversationId: string, senderId: string, text
     }
   }
   throw lastError || new Error('Failed to send message')
+}
+
+// Process offline queue
+async function processOfflineQueue() {
+  const pendingMessages = offlineQueue.getPendingMessages()
+  const pendingParticipants = offlineQueue.getPendingParticipants()
+  
+  console.log(`[OfflineQueue] Processing ${pendingMessages.length} messages and ${pendingParticipants.length} participants`)
+  
+  // Try to process participants first
+  for (const participant of pendingParticipants) {
+    try {
+      const res = await apiFetch(`${API_BASE}/conversations/${participant.conversationId}/participants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: participant.userId })
+      })
+      
+      if (res.ok || res.status === 409) {
+        offlineQueue.removeParticipant(participant.id)
+        console.log(`[OfflineQueue] Successfully processed participant ${participant.userId}`)
+      } else {
+        offlineQueue.markParticipantAttempted(participant.id)
+      }
+    } catch (e) {
+      console.error(`[OfflineQueue] Failed to process participant ${participant.userId}:`, e)
+      offlineQueue.markParticipantAttempted(participant.id)
+    }
+  }
+  
+  // Then process messages
+  for (const message of pendingMessages) {
+    try {
+      const keyB64 = getStoredKey(message.conversationId)
+      let body: any
+      
+      if (!keyB64) {
+        body = { conversation_id: message.conversationId, sender_id: message.senderId, plaintext: message.text, mime_type: message.mime }
+      } else {
+        const key = await importKeyBase64(keyB64)
+        const { ivB64, ctB64 } = await encryptText(key, message.text)
+        body = { conversation_id: message.conversationId, sender_id: message.senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: message.mime }
+      }
+      
+      const res = await apiFetch(`${API_BASE}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      
+      if (res.ok) {
+        offlineQueue.removeMessage(message.id)
+        console.log(`[OfflineQueue] Successfully processed message ${message.id}`)
+      } else {
+        offlineQueue.markMessageAttempted(message.id)
+      }
+    } catch (e) {
+      console.error(`[OfflineQueue] Failed to process message ${message.id}:`, e)
+      offlineQueue.markMessageAttempted(message.id)
+    }
+  }
+  
+  // If queue is empty, stop the retry mechanism
+  const stats = offlineQueue.getStats()
+  if (stats.pendingMessages === 0 && stats.pendingParticipants === 0) {
+    stopOfflineRetry()
+    console.log('[OfflineQueue] Queue empty, stopping retry mechanism')
+  }
 }
 
 // Helper para iniciar contacto desde productos u otros contextos

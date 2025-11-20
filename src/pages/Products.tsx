@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
 import { contactUser } from '../services/messagingService'
+import { offlineQueue } from '../services/offlineQueue'
 
 export default function Products() {
   const [q, setQ] = useState('')
@@ -16,6 +17,7 @@ export default function Products() {
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<Product[]>([])
   const [error, setError] = useState<string|null>(null)
+  const [offlineStatus, setOfflineStatus] = useState<{isOffline: boolean, queueSize: number}>({ isOffline: false, queueSize: 0 })
 
   const filtersRaw = useMemo(() => ({ q, category, locationText, distanceKm, sort }), [q, category, locationText, distanceKm, sort])
   const debounced = useDebouncedValue(filtersRaw, 350)
@@ -30,6 +32,22 @@ export default function Products() {
         ])
       } catch {}
     })()
+  }, [])
+
+  // Monitor offline status and queue size
+  useEffect(() => {
+    const checkOfflineStatus = () => {
+      const stats = offlineQueue.getStats()
+      setOfflineStatus({
+        isOffline: stats.pendingMessages > 0 || stats.pendingParticipants > 0,
+        queueSize: stats.pendingMessages + stats.pendingParticipants
+      })
+    }
+
+    checkOfflineStatus()
+    const interval = setInterval(checkOfflineStatus, 5000) // Check every 5 seconds
+
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(()=>{
@@ -99,6 +117,14 @@ export default function Products() {
 
       {/* Resultados */}
       <section className="mt-6">
+        {offlineStatus.isOffline && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700">
+            <div className="flex items-center gap-2">
+              <span className="material-icons-outlined text-[18px]">cloud_off</span>
+              <span>Modo offline activado. {offlineStatus.queueSize} mensaje(s) guardados localmente.</span>
+            </div>
+          </div>
+        )}
         {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
         {loading ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -217,6 +243,10 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
           errorMsg = 'Por favor inicia sesión para enviar mensajes'
         } else if (m.includes('403')) {
           errorMsg = 'No tienes permiso para enviar mensajes a este usuario'
+        } else if (m.includes('localmente')) {
+          // This is the offline queue message
+          errorMsg = m
+          setMsgSent(true) // Treat as sent since it's queued
         }
         
         setErr(errorMsg)
