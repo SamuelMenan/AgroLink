@@ -122,6 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         msg = 'Error de conexión con el servidor. Por favor, intenta nuevamente en unos momentos.'
       } else if (msg.includes('405')) {
         msg = 'Error temporal en el servidor. Por favor, intenta nuevamente.'
+      } else if (msg.includes('502') || msg.includes('503') || msg.includes('504')) {
+        msg = 'Servidor en arranque o temporalmente no disponible (502/503/504). Reintenta en unos segundos.'
       }
       
       return { error: msg }

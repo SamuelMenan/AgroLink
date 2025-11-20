@@ -68,9 +68,9 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
 
-  // Evitar duplicar creación de usuario: en sign-up sólo 1 intento para prevenir 422 por doble POST
+  // Detectar sign-up para control de reintentos: permitimos reintento sólo en errores de infraestructura (502/503/504)
   const isSignUp = /\/sign-up$/.test(path)
-  const maxRetries = isSignUp ? 1 : 2;
+  const maxRetries = isSignUp ? 2 : 2;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -167,8 +167,9 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
         }
         
         // For server errors (5xx), throw to trigger retry
-        if ([405, 502, 503, 504].includes(res.status) && attempt < maxRetries - 1) { 
-          console.log(`[apiAuth] Retry ${attempt + 1}/${maxRetries} after ${res.status} error`)
+        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
+          // Para sign-up: reintentar solo si es error de infraestructura (no duplicará creación; Supabase devolverá 422 en segundo intento si ya existe)
+          console.log(`[apiAuth] Retry ${attempt + 1}/${maxRetries} after infra ${res.status} error (isSignUp=${isSignUp})`)
           throw new Error(`Server error ${res.status}: ${text}`);
         }
         
@@ -200,7 +201,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
         throw err;
       }
       
-      const delay = 500 * (attempt + 1); // Increased delay
+      const delay = isSignUp ? 700 * (attempt + 1) : 500 * (attempt + 1); // Mayor backoff en sign-up para cold start backend
       console.warn(`[apiAuth] Attempt ${attempt + 1} failed for ${path}, retrying in ${delay}ms...`);
       await new Promise(r => setTimeout(r, delay));
     }
@@ -259,6 +260,10 @@ export async function signUp(fullName: string, email: string, password: string, 
     payload.phone = phone;
   }
   
+  // Pre-warm proxy/backend (health) antes de intentar alta, mitigando 502 por cold start
+  try { await warmupProxy(); } catch {
+    // Ignorar errores de warmup; no críticos para registro
+  }
   const resp = await post(`${AUTH_PREFIX}/sign-up`, payload);
   if (resp.access_token && resp.refresh_token) setTokens(resp);
   try { await warmupProxy(); } catch {
@@ -336,5 +341,6 @@ const resolveBaseUrl = () => {
 
 const BASE_URL = resolveBaseUrl();
 
+// Usar siempre ruta proxied para evitar fallos de CORS/502 en redirecciones OAuth.
 export const getOAuthStartUrl = (provider: string, next: string) =>
-  `${BASE_URL}/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+  `/api/proxy/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
