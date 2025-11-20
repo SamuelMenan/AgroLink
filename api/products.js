@@ -170,8 +170,22 @@ export default async function handler(req, res) {
     }
 
     if (method === 'GET') {
-      const q = urlObj.searchParams.get('q') || ''
-      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products${q ? (q.startsWith('?') ? q : `?${q}`) : ''}`
+      // Extract the 'q' parameter which contains the actual Supabase query
+      const qParam = urlObj.searchParams.get('q')
+      let supabaseQuery = ''
+      
+      if (qParam) {
+        // The q parameter contains URL-encoded Supabase query params like "select=*&user_id=eq.xxx"
+        // We need to pass this directly to Supabase
+        supabaseQuery = qParam.startsWith('?') ? qParam : `?${qParam}`
+      } else if (queryString) {
+        // Fallback to using the raw query string
+        supabaseQuery = queryString
+      }
+      
+      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products${supabaseQuery}`
+      
+      console.log('[products] Supabase GET fallback:', supabaseEndpoint)
       
       const supabaseResp = await fetch(supabaseEndpoint, {
         headers: supabaseHeaders,
