@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ProductForm, { type ProductFormValues } from '../../components/ProductForm'
 import { useAuth } from '../../context/AuthContext'
 import { createProduct } from '../../services/productService'
 
 export default function PublishProduct() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [publishedId, setPublishedId] = useState<string | null>(null)
 
@@ -26,6 +27,8 @@ export default function PublishProduct() {
         lng: values.lng,
       })
       setPublishedId(created.id)
+      // Auto-redirect to my products after 1.5s
+      setTimeout(() => navigate('/dashboard/products', { replace: true }), 1500)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error publicando el producto'
       setError(msg)
