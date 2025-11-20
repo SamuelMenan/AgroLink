@@ -288,26 +288,36 @@ async function supabaseSignInFallback(params: { email?: string; phone?: string; 
 
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
   // Support phone-only registration - backend will generate email if needed
-  const payload: Record<string, unknown> = { password, data: { full_name: fullName } };
-  
-  if (email && email.trim()) {
-    payload.email = email;
-  }
-  
-  if (phone && phone.trim()) {
-    payload.phone = phone;
-  }
-  
+  const basePayload: Record<string, unknown> = { password, data: { full_name: fullName } };
+  const hasEmail = !!(email && email.trim());
+  const hasPhone = !!(phone && phone.trim());
+
+  if (hasEmail) basePayload.email = email.trim();
+  if (hasPhone) basePayload.phone = phone!.trim();
+
   // Pre-warm proxy/backend (health) antes de intentar alta, mitigando 502 por cold start
-  try { await warmupProxy(); } catch {
-    // Ignorar errores de warmup; no críticos para registro
+  try { await warmupProxy(); } catch { /* ignore */ }
+
+  try {
+    const resp = await post(`${AUTH_PREFIX}/sign-up`, basePayload);
+    if (resp.access_token && resp.refresh_token) setTokens(resp);
+    try { await warmupProxy(); } catch { /* ignore */ }
+    return resp;
+  } catch (err) {
+    const msg = (err instanceof Error) ? err.message : String(err);
+    // Si el proveedor de email está deshabilitado, reintentar con registro sólo por teléfono (si está disponible)
+    if (/email_provider_disabled/i.test(msg)) {
+      if (!hasPhone) {
+        throw new Error('El registro por correo está deshabilitado. Regístrate con tu número de teléfono o usa Google/Facebook.');
+      }
+      const phoneOnly: Record<string, unknown> = { password, data: { full_name: fullName }, phone: phone!.trim() };
+      const resp = await post(`${AUTH_PREFIX}/sign-up`, phoneOnly);
+      if (resp.access_token && resp.refresh_token) setTokens(resp);
+      try { await warmupProxy(); } catch { /* ignore */ }
+      return resp;
+    }
+    throw err;
   }
-  const resp = await post(`${AUTH_PREFIX}/sign-up`, payload);
-  if (resp.access_token && resp.refresh_token) setTokens(resp);
-  try { await warmupProxy(); } catch {
-    // Silently ignore warmup errors during sign up
-  }
-  return resp;
 }
 
 export async function signInEmail(email: string, password: string) {
