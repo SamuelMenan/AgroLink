@@ -248,6 +248,44 @@ async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAu
   return JSON.parse(text) as BackendAuthResponse;
 }
 
+// Fallback directo a Supabase para sign-in por email o teléfono cuando el backend está caído/cold.
+async function supabaseSignInFallback(params: { email?: string; phone?: string; password: string }): Promise<BackendAuthResponse> {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+  const SUPABASE_URL: string | undefined = env.VITE_SUPABASE_URL;
+  const SUPABASE_ANON_KEY: string | undefined = env.VITE_SUPABASE_ANON_KEY;
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Supabase fallback not configured (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)');
+  }
+
+  const endpoint = `${SUPABASE_URL.replace(/\/+$/, '')}/auth/v1/token?grant_type=password`;
+  const payload: Record<string, unknown> = { password: params.password };
+  if (params.email && params.email.trim()) payload.email = params.email;
+  if (params.phone && params.phone.trim()) payload.phone = params.phone;
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const json = JSON.parse(text);
+      const detail = (json.error && (json.error.message || json.error.code)) || json.message || text;
+      throw new Error(`Supabase ${res.status}: ${detail}`);
+    } catch {
+      throw new Error(`Supabase ${res.status}: ${text}`);
+    }
+  }
+
+  return JSON.parse(text) as BackendAuthResponse;
+}
+
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
   // Support phone-only registration - backend will generate email if needed
   const payload: Record<string, unknown> = { password, data: { full_name: fullName } };
@@ -273,21 +311,60 @@ export async function signUp(fullName: string, email: string, password: string, 
 }
 
 export async function signInEmail(email: string, password: string) {
-  const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
-  if (resp.access_token && resp.refresh_token) setTokens(resp);
-  try { await warmupProxy(); } catch {
-    // Silently ignore warmup errors during sign in
+  try {
+    const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
+    if (resp.access_token && resp.refresh_token) setTokens(resp);
+    try { await warmupProxy(); } catch { /* ignore */ }
+    return resp;
+  } catch (err) {
+    const msg = (err instanceof Error) ? err.message : String(err);
+    const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|502|503|504/i.test(msg);
+    if (!isInfra) throw err;
+    // Fallback directo a Supabase para completar login en caso de cold start/5xx
+    try {
+      const fb = await supabaseSignInFallback({ email, password });
+      if (fb.access_token && fb.refresh_token) setTokens(fb);
+      try { await warmupProxy(); } catch { /* ignore */ }
+      return fb;
+    } catch (fbErr) {
+      const eMsg = (fbErr instanceof Error) ? fbErr.message : String(fbErr);
+      if (/Supabase\s+(400|401)/i.test(eMsg)) {
+        throw new Error('Credenciales inválidas. Verifica tu correo y contraseña.');
+      }
+      if (/Supabase\s+429|Too\s+Many|rate\s*limit/i.test(eMsg)) {
+        throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.');
+      }
+      throw fbErr;
+    }
   }
-  return resp;
 }
 
 export async function signInPhone(phone: string, password: string) {
-  const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
-  if (resp.access_token && resp.refresh_token) setTokens(resp);
-  try { await warmupProxy(); } catch {
-    // Silently ignore warmup errors during sign in
+  try {
+    const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
+    if (resp.access_token && resp.refresh_token) setTokens(resp);
+    try { await warmupProxy(); } catch { /* ignore */ }
+    return resp;
+  } catch (err) {
+    const msg = (err instanceof Error) ? err.message : String(err);
+    const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|502|503|504/i.test(msg);
+    if (!isInfra) throw err;
+    try {
+      const fb = await supabaseSignInFallback({ phone, password });
+      if (fb.access_token && fb.refresh_token) setTokens(fb);
+      try { await warmupProxy(); } catch { /* ignore */ }
+      return fb;
+    } catch (fbErr) {
+      const eMsg = (fbErr instanceof Error) ? fbErr.message : String(fbErr);
+      if (/Supabase\s+(400|401)/i.test(eMsg)) {
+        throw new Error('Credenciales inválidas. Verifica tu teléfono y contraseña.');
+      }
+      if (/Supabase\s+429|Too\s+Many|rate\s*limit/i.test(eMsg)) {
+        throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.');
+      }
+      throw fbErr;
+    }
   }
-  return resp;
 }
 
 export async function refreshSession() {
