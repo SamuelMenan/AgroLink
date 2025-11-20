@@ -170,6 +170,7 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     }
     setSendingMsg(true)
     try {
+      try { await fetch('/api/proxy/actuator/health', { cache: 'no-store' }) } catch {}
       // Crear/asegurar conversación con el vendedor y enviar mensaje inicial
       await contactUser(user.id, p.user_id, text)
       setMsgSent(true)
