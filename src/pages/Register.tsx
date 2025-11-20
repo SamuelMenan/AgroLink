@@ -30,7 +30,8 @@ export default function Register() {
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
-    setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
+    const sanitized = type === 'checkbox' ? checked : value.replace(/^\s+/, '')
+    setForm((f) => ({ ...f, [name]: sanitized }))
   }
 
   function validate(): boolean {
