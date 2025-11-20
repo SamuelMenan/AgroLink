@@ -12,7 +12,7 @@ const API_BASE = '/api/v1'
 export async function ensureConversationWith(userId: string, otherUserId: string): Promise<Conversation> {
   // Buscar conversaciones existentes (incluyendo aquellas donde el usuario es el único participante)
   const existingIds = await listConversationIds(userId)
-  let selected: Conversation | undefined
+  let selected: Conversation | null = null
   let selectedParticipants: string[] = []
   for (const id of existingIds) {
     const participants = await getParticipantIds(id)
@@ -39,7 +39,7 @@ export async function ensureConversationWith(userId: string, otherUserId: string
     // Crear nueva conversación
     const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
     if (!res.ok) {
-      const detail = await res.text().catch(()=> '')
+      const detail = await res.text().catch(() => '')
       if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
       if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
       throw new Error(`Error ${res.status} creando conversación`)
@@ -49,10 +49,14 @@ export async function ensureConversationWith(userId: string, otherUserId: string
     selectedParticipants = []
   }
 
+  if (!selected) {
+    throw new Error('No se pudo crear o recuperar la conversación')
+  }
+
   // Añadir participantes necesarios sin provocar conflicto 409
   const add = async (uid: string) => {
     if (selectedParticipants.includes(uid)) return
-    const r = await apiFetch(`${API_BASE}/conversations/${selected!.id}/participants`, {
+    const r = await apiFetch(`${API_BASE}/conversations/${selected.id}/participants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: uid })
