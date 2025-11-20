@@ -18,7 +18,6 @@ export default function Register() {
   const [form, setForm] = useState<Form>(initial)
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [info, setInfo] = useState<string | null>(null)
   const navigate = useNavigate()
   const { signUpWithEmail } = useAuth()
   const { signInWithGoogle, signInWithFacebook } = useAuth()
@@ -68,12 +67,11 @@ export default function Register() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setInfo(null)
     if (!validate()) return
     setSubmitting(true)
     try {
       // En esta HU priorizamos registro por email; el teléfono se guarda en metadata
-      const { error, needsEmailConfirmation } = await signUpWithEmail({
+      const { error } = await signUpWithEmail({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
@@ -83,19 +81,11 @@ export default function Register() {
         setErrors((prev) => ({ ...prev, email: error }))
         return
       }
-      if (needsEmailConfirmation) {
-        setInfo('Registro exitoso. Revisa tu correo para confirmar tu cuenta. Después podrás iniciar sesión.')
-        // Redirigir al login después de unos segundos
-        setTimeout(() => {
-          navigate('/login', { replace: true })
-        }, 4000)
-      } else {
-        // Si no necesita confirmación, redirigir al login inmediatamente
-        setInfo('Registro exitoso. Ahora puedes iniciar sesión.')
-        setTimeout(() => {
-          navigate('/login', { replace: true })
-        }, 1500)
-      }
+      // Registro exitoso - navegar inmediatamente a /simple
+      navigate('/simple', { replace: true })
+    } catch (navError) {
+      console.error('Error durante la navegación:', navError)
+      setErrors((prev) => ({ ...prev, email: 'Error al redirigir. Por favor, intenta nuevamente.' }))
     } finally {
       setSubmitting(false)
     }
@@ -142,7 +132,6 @@ export default function Register() {
           <label htmlFor="terms" className="text-sm text-gray-700">Acepto los <a className="text-green-700 underline" href="#" onClick={(e)=>e.preventDefault()}>términos y condiciones</a>.</label>
         </div>
         {errors.terms && <p className="-mt-2 text-sm text-red-600">{errors.terms}</p>}
-        {info && <p className="text-sm text-green-700">{info}</p>}
         {errors.email && errors.email.includes('registrado') && (
           <div className="mt-2 text-sm text-blue-600">
             ¿Ya tienes una cuenta?{' '}

@@ -8,7 +8,7 @@ type AuthContextValue = {
   user: User | null
   loading: boolean
   signOut: () => Promise<void>
-  signUpWithEmail: (params: { fullName: string; email: string; password: string; phone?: string }) => Promise<{ needsEmailConfirmation?: boolean; error?: string }>
+  signUpWithEmail: (params: { fullName: string; email: string; password: string; phone?: string }) => Promise<{ error?: string }>
   signInWithEmail: (params: { email: string; password: string }) => Promise<{ error?: string }>
   signInWithCredentials: (params: { identifier: string; password: string }) => Promise<{ error?: string }>
   signInWithGoogle: (redirectTo?: string) => Promise<void>
@@ -63,29 +63,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+/**
+ * Registra un nuevo usuario por email.
+ * 
+ * IMPORTANTE: Requiere que la confirmación de email esté desactivada en la configuración de Supabase.
+ * Si no se desactiva, el sistema mostrará warnings en consola y el acceso será limitado
+ * cuando no se reciban tokens de autenticación.
+ */
   const signUpWithEmail: AuthContextValue['signUpWithEmail'] = async ({ fullName, email, password, phone }) => {
     try {
       const resp = await signUp(fullName, email, password, phone)
       const u = deriveUserFromTokens(resp)
       
-      // Si hay un usuario válido, establecerlo
+      // Si hay un usuario válido, establecerlo (considerar autenticado si existen tokens)
       if (u) {
         setUser(u)
+      } else if (!resp.access_token) {
+        // Warning cuando Supabase no devuelve tokens
+        console.warn('Supabase no devolvió tokens - sesión limitada')
       }
       
-      // Si el backend exige confirmación por correo, puede faltar access_token.
-      const needsEmailConfirmation = !resp.access_token
-      
-      // Si el usuario fue creado pero no hay tokens (caso 422), considerarlo como necesitando confirmación
-      return { needsEmailConfirmation: needsEmailConfirmation || !u }
+      // Siempre devolver objeto vacío cuando falten tokens
+      return {}
     } catch (e) {
       let msg = e instanceof Error ? e.message : 'Error en el registro'
       
       // Provide more user-friendly error messages
-      if (msg.includes('422')) {
-        // 422 significa que el usuario fue creado pero hay algún problema adicional
-        return { needsEmailConfirmation: true }
-      } else if (msg.includes('400')) {
+      if (msg.includes('400')) {
         msg = 'Los datos del formulario no son válidos. Por favor, verifica tu información.'
       } else if (msg.includes('network') || msg.includes('Network')) {
         msg = 'Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.'
