@@ -7,6 +7,7 @@
     { "source": "/api/proxy/api/v1/conversations/(.*)/participants", "destination": "https://agrolinkbackend.onrender.com/api/v1/conversations/$1/participants" },
     { "source": "/api/proxy/api/v1/products", "destination": "/api/products" },
     { "source": "/api/proxy/api/v1/products/(.*)", "destination": "/api/products/$1" },
+    { "source": "/api/proxy/api/v1/auth/refresh", "destination": "/api/refresh" },
     { "source": "/api/proxy/api/v1/messages", "destination": "https://agrolinkbackend.onrender.com/api/v1/messages" },
     { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" },
     { "source": "/assets/(.*)", "destination": "/assets/$1" },

@@ -6,7 +6,7 @@ async function warmupBackend() {
   console.log('[products] Starting backend warmup...')
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
+    const timeout = setTimeout(() => controller.abort(), 12000)
     const start = Date.now()
     
     await fetch(`${backendUrl}/actuator/health`, { 
@@ -63,7 +63,14 @@ export default async function handler(req, res) {
   
   const queryString = urlObj.search
   
-  console.log('[products] Parsed:', { pathSuffix, queryString, method })
+  console.log('[products] Parsed:', { 
+    pathSuffix, 
+    queryString, 
+    method,
+    fullUrl: req.url,
+    pathname: urlObj.pathname,
+    searchParams: Object.fromEntries(urlObj.searchParams)
+  })
 
   // Warmup backend BEFORE attempting main request
   console.log('[products] Warming up backend before request...')
@@ -72,7 +79,16 @@ export default async function handler(req, res) {
 
   // Try backend first
   try {
-    const backendEndpoint = `${backendUrl}/api/v1/products${pathSuffix ? `/${pathSuffix}` : ''}${queryString}`
+    // For GET requests with 'q' parameter, extract and use it directly
+    let backendEndpoint
+    const qParam = urlObj.searchParams.get('q')
+    if (method === 'GET' && qParam) {
+      // The 'q' param contains the actual Supabase query - pass it as query string
+      backendEndpoint = `${backendUrl}/api/v1/products?${qParam}`
+      console.log('[products] Using q parameter for backend:', qParam)
+    } else {
+      backendEndpoint = `${backendUrl}/api/v1/products${pathSuffix ? `/${pathSuffix}` : ''}${queryString}`
+    }
     
     // Prepare headers from incoming request
     const outgoingHeaders = new Headers()

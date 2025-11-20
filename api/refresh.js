@@ -6,7 +6,7 @@ async function warmupBackend() {
   console.log('[refresh] Starting backend warmup...')
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
+    const timeout = setTimeout(() => controller.abort(), 12000)
     const start = Date.now()
     
     await fetch(`${base}/actuator/health`, { 
