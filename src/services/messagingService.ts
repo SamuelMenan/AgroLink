@@ -227,7 +227,12 @@ export async function sendMessage(conversationId: string, senderId: string, text
 
 // Helper para iniciar contacto desde productos u otros contextos
 export async function contactUser(currentUserId: string, otherUserId: string, initialText: string = 'Hola. ¿Sigue estando disponible?'): Promise<Conversation> {
-  const conv = await ensureConversationWith(currentUserId, otherUserId)
+  let conv: Conversation
+  try {
+    conv = await ensureConversationWith(currentUserId, otherUserId)
+  } catch {
+    conv = await ensureConversationQuick(currentUserId, otherUserId)
+  }
   await sendMessage(conv.id, currentUserId, initialText)
   return conv
 }
@@ -259,4 +264,32 @@ export async function uploadAttachment(): Promise<{ url: string; mime: string }>
 export async function sendAttachment(_conversationId?: string, _userId?: string, _file?: File): Promise<void> {
   void _conversationId; void _userId; void _file;
   throw new Error('Adjuntos no migrados aún')
+}
+async function ensureConversationQuick(userId: string, otherUserId: string): Promise<Conversation> {
+  const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
+  if (!res.ok) {
+    const detail = await res.text().catch(()=> '')
+    if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
+    if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
+    throw new Error(`Error ${res.status} creando conversación`)
+  }
+  const createdJson = await res.json()
+  const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
+  const add = async (uid: string) => {
+    const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: uid })
+    })
+    if (!r.ok) {
+      const detail = await r.text().catch(()=> '')
+      if (r.status === 401) throw new Error('No autorizado al registrar participante')
+      if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+      if (r.status === 409) return
+      throw new Error(`Error ${r.status} añadiendo participante`)
+    }
+  }
+  await add(userId)
+  if (otherUserId !== userId) await add(otherUserId)
+  return conv
 }

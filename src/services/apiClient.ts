@@ -30,6 +30,9 @@ async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string, directU
   try {
     await fetchImpl(`${proxyUrlBase}/actuator/health`, { cache: 'no-store' })
   } catch { /* ignore */ }
+  try {
+    await fetchImpl(`/api/warm`, { cache: 'no-store' })
+  } catch { /* ignore */ }
   // Only attempt cross-origin warm-up if the frontend and backend share origin; otherwise it just produces CORS noise.
   if (typeof window === 'undefined' || directUrlBase.startsWith(window.location.origin)) {
     try {
