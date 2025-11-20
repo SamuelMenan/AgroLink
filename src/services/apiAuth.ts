@@ -84,7 +84,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
           'X-Request-Type': 'proxy'
         }, 
         body: JSON.stringify(body) 
-      }, 8000) // Increased timeout to 8s
+      }, 6000) // 6s timeout for auth ops (refresh goes direct to Supabase)
       // Si falla (405/5xx), intentar backend directo
       if (!res.ok && [405, 502, 503, 504].includes(res.status) && !isSignUp) {
         console.warn(`[apiAuth] Proxy failed with ${res.status}, attempting direct backend`, {
