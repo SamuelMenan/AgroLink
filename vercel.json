@@ -1,9 +1,18 @@
 {
   "version": 2,
   "rewrites": [
-    
+    { "source": "/api/proxy/api/v1/notifications/by-user/(.*)", "destination": "/api/notifications/by-user?user_id=$1" },
+    { "source": "/api/proxy/api/v1/notifications/read-all/(.*)", "destination": "/api/notifications/read-all?user_id=$1" },
+    { "source": "/api/proxy/api/v1/conversations", "destination": "https://agrolinkbackend.onrender.com/api/v1/conversations" },
+    { "source": "/api/proxy/api/v1/conversations/(.*)/participants", "destination": "https://agrolinkbackend.onrender.com/api/v1/conversations/$1/participants" },
+    { "source": "/api/proxy/api/v1/products", "destination": "/api/products" },
+    { "source": "/api/proxy/api/v1/messages", "destination": "https://agrolinkbackend.onrender.com/api/v1/messages" },
+    { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" },
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*\\.(?:js|css|png|jpg|svg|json|map|ico))", "destination": "/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/warm", "schedule": "*/10 * * * *" }
   ]
 }

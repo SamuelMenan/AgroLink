@@ -75,6 +75,9 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
           }
         }
       }
+      if (!res.ok && [502, 503, 504].includes(res.status)) {
+        try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, status: res.status, attempt }) }) } catch {}
+      }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
         await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
         await sleep(600 * (attempt + 1))
@@ -95,6 +98,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     ;(error as { cause?: unknown }).cause = lastError
   }
   ;(error as { url?: string }).url = lastUrlTried
+  try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, error: (error as Error).message }) }) } catch {}
   console.error('[apiFetch] request failed after retries', { path, lastUrlTried, error })
   throw error
 }
