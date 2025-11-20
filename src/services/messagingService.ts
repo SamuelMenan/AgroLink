@@ -299,7 +299,7 @@ async function processOfflineQueue() {
   for (const message of pendingMessages) {
     try {
       const keyB64 = getStoredKey(message.conversationId)
-      let body: any
+      let body: string | object
 
       if (!keyB64) {
         body = { conversation_id: message.conversationId, sender_id: message.senderId, plaintext: message.text, mime_type: message.mime }

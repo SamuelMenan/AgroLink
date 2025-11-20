@@ -72,7 +72,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const needsEmailConfirmation = !resp.access_token
       return { needsEmailConfirmation }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error registro'
+      let msg = e instanceof Error ? e.message : 'Error en el registro'
+      
+      // Provide more user-friendly error messages
+      if (msg.includes('422')) {
+        msg = 'Este correo electrónico ya está registrado. Por favor, intenta iniciar sesión o usa otro correo.'
+      } else if (msg.includes('400')) {
+        msg = 'Los datos del formulario no son válidos. Por favor, verifica tu información.'
+      } else if (msg.includes('network') || msg.includes('Network')) {
+        msg = 'Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.'
+      } else if (msg.includes('timeout')) {
+        msg = 'El servidor está tardando demasiado en responder. Por favor, intenta nuevamente.'
+      } else if (msg.includes('CORS') || msg.includes('cors')) {
+        msg = 'Error de conexión con el servidor. Por favor, intenta nuevamente en unos momentos.'
+      } else if (msg.includes('405')) {
+        msg = 'Error temporal en el servidor. Por favor, intenta nuevamente.'
+      }
+      
       return { error: msg }
     }
   }

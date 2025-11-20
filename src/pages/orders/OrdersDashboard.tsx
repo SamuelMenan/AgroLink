@@ -194,7 +194,7 @@ function StatusPill({ status }: { status: Order['status'] }){
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>{STATUS_LABELS[status]}</span>
 }
 
-function ReviewInline({ productId, orderId: _orderId }: { productId: string; orderId: string }){
+function ReviewInline({ productId }: { productId: string; orderId: string }){
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [rating, setRating] = useState(5)

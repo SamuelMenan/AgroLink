@@ -74,18 +74,48 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
     try {
       // Primario: proxy same-origin
       let res = await fetchWithTimeout(proxyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
-      // Si falla (405/5xx), intentar backend directo solo si es mismo origen
-      if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
-        const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
-        if (sameOrigin) {
+      // Si falla (405/5xx), intentar backend directo
+      if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
+        console.warn(`[apiAuth] Proxy failed with ${res.status}, attempting direct backend`, {
+          endpoint: path,
+          status: res.status,
+          directUrl: directUrl,
+          sameOrigin: (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
+        })
+        
+        // For 405 errors, always attempt direct backend regardless of origin
+        // For other errors, only attempt if same origin to avoid CORS issues
+        const shouldAttemptDirect = res.status === 405 || (typeof window !== 'undefined' ? (new URL(BASE_URL).origin === window.location.origin) : true)
+        
+        if (shouldAttemptDirect) {
           try {
-            res = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
-          } catch { /* ignore secondary network error */ }
+            console.log(`[apiAuth] Attempting direct fetch to: ${directUrl}`)
+            const directRes = await fetchWithTimeout(directUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) }, 6000)
+            console.log(`[apiAuth] Direct fetch result: ${directRes.status}`)
+            // Use the direct response if it succeeds
+            if (directRes.ok) {
+              res = directRes
+            }
+          } catch (directError) {
+            console.error('[apiAuth] Direct fetch failed:', directError)
+            // Check if it's a CORS error
+            if (directError instanceof Error && directError.message.includes('CORS')) {
+              console.warn('[apiAuth] CORS error detected on direct fetch - this is expected for cross-origin requests')
+              // Don't treat CORS errors as complete failures - the backend might still be reachable via other means
+            }
+            // Continue with original error
+          }
+        } else {
+          console.warn('[apiAuth] Skipping direct fetch - cross-origin detected and not a 405 error')
         }
       }
       const text = await res.text();
       if (!res.ok) {
-        if ([502, 503, 504].includes(res.status) && attempt < maxRetries - 1) { await new Promise(r => setTimeout(r, 400 * (attempt + 1))); continue; }
+        if ([405, 502, 503, 504].includes(res.status) && attempt < maxRetries - 1) { 
+          console.log(`[apiAuth] Retry ${attempt + 1}/${maxRetries} after ${res.status} error`)
+          await new Promise(r => setTimeout(r, 400 * (attempt + 1))); 
+          continue; 
+        }
         try {
           const json = JSON.parse(text);
           const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
@@ -145,21 +175,27 @@ async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAu
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-up`, { email, password, data: { full_name: fullName, phone } });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
-  try { await warmupProxy(); } catch {}
+  try { await warmupProxy(); } catch {
+    // Silently ignore warmup errors during sign up
+  }
   return resp;
 }
 
 export async function signInEmail(email: string, password: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
-  try { await warmupProxy(); } catch {}
+  try { await warmupProxy(); } catch {
+    // Silently ignore warmup errors during sign in
+  }
   return resp;
 }
 
 export async function signInPhone(phone: string, password: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
-  try { await warmupProxy(); } catch {}
+  try { await warmupProxy(); } catch {
+    // Silently ignore warmup errors during sign in
+  }
   return resp;
 }
 

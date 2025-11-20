@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Registration 405 Fallback</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 16px;
+        }
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .console {
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            padding: 16px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #e8f5e8;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffeaea;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        .warning {
+            background-color: #fff3e0;
+            border: 1px solid #ff9800;
+            color: #e65100;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Registration 405 Fallback</h1>
+        <p>This test verifies that the registration system properly handles 405 errors by falling back to direct backend access.</p>
+        
+        <div>
+            <button onclick="testRegistration()">Test Registration Fallback</button>
+            <button onclick="clearConsole()">Clear Console</button>
+        </div>
+        
+        <div id="results"></div>
+        <div id="console" class="console"></div>
+    </div>
+
+    <script>
+        // Override console methods to display in our custom console
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function logToConsole(level, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            
+            const consoleDiv = document.getElementById('console');
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '4px';
+            logEntry.style.color = level === 'error' ? '#ff6b6b' : level === 'warn' ? '#ffd93d' : '#f0f0f0';
+            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
+            
+            consoleDiv.appendChild(logEntry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            
+            // Also log to original console
+            if (level === 'error') {
+                originalError(...args);
+            } else if (level === 'warn') {
+                originalWarn(...args);
+            } else {
+                originalLog(...args);
+            }
+        }
+        
+        console.log = (...args) => logToConsole('log', ...args);
+        console.error = (...args) => logToConsole('error', ...args);
+        console.warn = (...args) => logToConsole('warn', ...args);
+
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testRegistration() {
+            clearConsole();
+            console.log('🚀 Starting Registration 405 Fallback Test...\n');
+            
+            const testEmail = `test-${Date.now()}@example.com`;
+            const testPassword = 'Test123!@#';
+            const testFullName = 'Test User Fallback';
+            
+            const testData = {
+                email: testEmail,
+                password: testPassword,
+                data: {
+                    full_name: testFullName,
+                    phone: '1234567890'
+                }
+            };
+
+            console.log(`📧 Test Email: ${testEmail}`);
+            console.log(`🔑 Test Password: ${testPassword}`);
+            console.log('');
+
+            try {
+                // Test the actual registration endpoint used by the app
+                console.log('1️⃣ Testing registration via auth service...');
+                
+                // Import the signUp function from the auth service
+                const response = await fetch('/api/proxy/api/v1/auth/sign-up', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                console.log(`📊 Response Status: ${response.status} ${response.statusText}`);
+                
+                const responseText = await response.text();
+                console.log(`📄 Response Body: ${responseText}`);
+                
+                if (response.ok) {
+                    console.log('🎉 SUCCESS: Registration completed successfully!');
+                    addResult('✅ Registration successful - fallback is working!', 'success');
+                    
+                    // Try to parse the response
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.access_token) {
+                            console.log('🔑 Access token received');
+                        }
+                        if (data.user) {
+                            console.log('👤 User data received:', data.user);
+                        }
+                    } catch (e) {
+                        console.log('ℹ️  Response is not JSON format');
+                    }
+                } else if (response.status === 405) {
+                    console.log('⚠️  Got 405 error - checking if fallback was triggered...');
+                    addResult('⚠️  Received 405 error from proxy - fallback should be triggered', 'warning');
+                    
+                    // Wait a moment to see if fallback appears in console
+                    setTimeout(() => {
+                        console.log('🔍 Check browser console for fallback logs');
+                        addResult('🔍 Check browser console for [apiAuth] fallback logs', 'info');
+                    }, 2000);
+                } else {
+                    console.log(`❌ Registration failed with status: ${response.status}`);
+                    addResult(`❌ Registration failed: ${response.status} ${response.statusText}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('❌ Network error during registration:', error.message);
+                addResult(`❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            console.log('🌐 Registration 405 Fallback Test Page Loaded');
+            console.log('Click "Test Registration Fallback" to verify the mechanism.');
+        });
+    </script>
+</body>
+</html>

@@ -30,7 +30,9 @@ export default function Products() {
           fetch('/api/proxy/actuator/health', { cache: 'no-store' }).catch(() => {}),
           fetch('/api/warm', { cache: 'no-store' }).catch(() => {})
         ])
-      } catch {}
+      } catch {
+        // Silently ignore warmup errors
+      }
     })()
   }, [])
 
@@ -212,7 +214,9 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
             fetch('/api/proxy/actuator/health', { cache: 'no-store' }).catch(() => {}),
             fetch('/api/warm', { cache: 'no-store' }).catch(() => {})
           ])
-        } catch {}
+        } catch {
+            // Silently ignore health check errors
+          }
         
         // Wait a bit after pre-warming for cold start mitigation
         if (attempt > 1) {

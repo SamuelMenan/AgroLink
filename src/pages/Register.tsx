@@ -121,12 +121,12 @@ export default function Register() {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-          <input name="password" value={form.password} onChange={onChange} type="password" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="password" value={form.password} onChange={onChange} type="password" autoComplete="new-password" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
           {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Confirmar contraseña</label>
-          <input name="confirmPassword" value={form.confirmPassword} onChange={onChange} type="password" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="confirmPassword" value={form.confirmPassword} onChange={onChange} type="password" autoComplete="new-password" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
           {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
         </div>
         <div className="flex items-start gap-2">
@@ -135,6 +135,14 @@ export default function Register() {
         </div>
         {errors.terms && <p className="-mt-2 text-sm text-red-600">{errors.terms}</p>}
         {info && <p className="text-sm text-green-700">{info}</p>}
+        {errors.email && errors.email.includes('registrado') && (
+          <div className="mt-2 text-sm text-blue-600">
+            ¿Ya tienes una cuenta?{' '}
+            <a href="/login" className="text-green-600 hover:text-green-700 underline">
+              Inicia sesión aquí
+            </a>
+          </div>
+        )}
         <button disabled={submitting} type="submit" className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Creando cuenta…' : 'Registrarse'}</button>
       </form>
 

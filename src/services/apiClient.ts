@@ -190,8 +190,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary)
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 12000)
       
-      // If proxy fails with 502/503/504, immediately try direct fetch (if endpoint supports CORS)
-      if (!res.ok && [502, 503, 504].includes(res.status)) {
+      // If proxy fails with 405/502/503/504, immediately try direct fetch (if endpoint supports CORS)
+      if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
         const endpointPath = path.split('/').slice(0, 4).join('/')
         
         if (isEndpointCorsCompatible(endpointPath)) {
@@ -241,7 +241,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       }
       
       // Si falla (405/5xx), intentar directo al backend solo si es mismo origen
-      if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
+      if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
         const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         if (sameOrigin) {
           try {
@@ -252,11 +252,13 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
           }
         }
       }
-      if (!res.ok && [502, 503, 504].includes(res.status)) {
-        try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, status: res.status, attempt }) }) } catch {}
+      if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
+        try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, status: res.status, attempt }) }) } catch {
+          // Silently ignore metrics errors
+        }
         recordFailure() // Record failure for circuit breaker
       }
-      if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
+      if (!res.ok && [405, 502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
         // Enhanced retry with exponential backoff and pre-warming
         const backoffMs = calculateBackoff(attempt, 600)
         console.warn(`[apiFetch] Retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path} (status: ${res.status})`)
@@ -301,9 +303,9 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
           } catch (directError) {
             console.error('[apiFetch] Direct fetch also failed:', directError)
             // Record that this endpoint doesn't work with direct access
-            if (directError instanceof Error && directError.message.includes('CORS')) {
+            if (directError instanceof Error && (directError.message.includes('CORS') || directError.message.includes('blocked'))) {
               recordCorsCompatibility(endpointPath, false)
-              console.warn(`[apiFetch] Endpoint ${endpointPath} marked as CORS-incompatible`)
+              console.warn(`[apiFetch] Endpoint ${endpointPath} marked as CORS-incompatible due to:`, directError.message)
             }
           }
         } else {
@@ -333,7 +335,9 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     error.message = `${error.message} (Service circuit breaker is open - too many failures)`
   }
   
-  try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, error: (error as Error).message }) }) } catch {}
+  try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, error: (error as Error).message }) }) } catch {
+    // Silently ignore metrics errors
+  }
   console.error('[apiFetch] request failed after retries', { path, lastUrlTried, error })
   throw error
 }

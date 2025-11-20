@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Fallback Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 16px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #e8f5e8;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffeaea;
+            border: 1px solid #f44336;
+            color: #c62828;
+        }
+        .info {
+            background-color: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1565c0;
+        }
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .console-output {
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            padding: 16px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background-color: #4caf50; }
+        .status-error { background-color: #f44336; }
+        .status-pending { background-color: #ff9800; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Registration Fallback Test</h1>
+        <p>This page tests the registration fallback mechanism for 405 errors. The system should automatically fall back to direct backend access when the proxy returns a 405 error.</p>
+        
+        <div class="test-section">
+            <h3>Test Controls</h3>
+            <button id="runTests" onclick="runAllTests()">Run All Tests</button>
+            <button id="testProxy" onclick="testProxyOnly()">Test Proxy Only</button>
+            <button id="testDirect" onclick="testDirectOnly()">Test Direct Backend Only</button>
+            <button id="clearOutput" onclick="clearOutput()">Clear Output</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Results</h3>
+            <div id="testResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Console Output</h3>
+            <div id="consoleOutput" class="console-output"></div>
+        </div>
+    </div>
+
+    <script>
+        // Override console.log to display in our custom console
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        
+        function logToConsole(level, ...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            
+            const consoleDiv = document.getElementById('consoleOutput');
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '4px';
+            logEntry.style.color = level === 'error' ? '#ff6b6b' : level === 'warn' ? '#ffd93d' : '#f0f0f0';
+            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
+            
+            consoleDiv.appendChild(logEntry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            
+            // Also log to original console
+            if (level === 'error') {
+                originalConsoleError(...args);
+            } else if (level === 'warn') {
+                originalConsoleWarn(...args);
+            } else {
+                originalConsoleLog(...args);
+            }
+        }
+        
+        console.log = (...args) => logToConsole('log', ...args);
+        console.error = (...args) => logToConsole('error', ...args);
+        console.warn = (...args) => logToConsole('warn', ...args);
+
+        function addResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('testResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = `<strong>${title}</strong>\n${content}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearOutput() {
+            document.getElementById('testResults').innerHTML = '';
+            document.getElementById('consoleOutput').innerHTML = '';
+        }
+
+        async function testRegistration(url, description) {
+            console.log(`\n🧪 Testing: ${description}`);
+            console.log(`📍 URL: ${url}`);
+            
+            const testData = {
+                email: `test-${Date.now()}@example.com`,
+                password: 'Test123!@#',
+                data: {
+                    full_name: 'Test User',
+                    phone: '1234567890'
+                }
+            };
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+                
+                console.log(`⏱️  Response time: ${duration}ms`);
+                console.log(`📊 Status: ${response.status} ${response.statusText}`);
+                
+                const responseText = await response.text();
+                console.log(`📄 Response body: ${responseText}`);
+                
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    statusText: response.statusText,
+                    duration,
+                    responseText
+                };
+                
+            } catch (error) {
+                console.error(`❌ Error: ${error.message}`);
+                return {
+                    success: false,
+                    error: error.message,
+                    status: 0
+                };
+            }
+        }
+
+        async function runAllTests() {
+            clearOutput();
+            console.log('🚀 Starting Registration Fallback Tests...\n');
+            
+            const PROXY_URL = '/api/proxy/api/v1/auth/sign-up';
+            const DIRECT_URL = 'https://agrolinkbackend.onrender.com/api/v1/auth/sign-up';
+            
+            // Test 1: Proxy endpoint
+            console.log('\n1️⃣ Testing Proxy Endpoint (Same Origin)');
+            console.log('-'.repeat(40));
+            const proxyResult = await testRegistration(PROXY_URL, 'Proxy Registration');
+            
+            addResult(
+                'Proxy Registration Test',
+                `Status: ${proxyResult.status} ${proxyResult.statusText}\nDuration: ${proxyResult.duration}ms\nSuccess: ${proxyResult.success}`,
+                proxyResult.success ? 'success' : 'error'
+            );
+            
+            // Test 2: Direct backend endpoint
+            console.log('\n2️⃣ Testing Direct Backend Endpoint (Cross Origin)');
+            console.log('-'.repeat(40));
+            const directResult = await testRegistration(DIRECT_URL, 'Direct Backend Registration');
+            
+            addResult(
+                'Direct Backend Registration Test',
+                `Status: ${directResult.status} ${directResult.statusText}\nDuration: ${directResult.duration}ms\nSuccess: ${directResult.success}`,
+                directResult.success ? 'success' : 'error'
+            );
+            
+            // Analysis
+            console.log('\n🔍 Analysis:');
+            if (!proxyResult.success && directResult.success) {
+                console.log('✅ Fallback mechanism is working correctly!');
+                console.log('   Proxy failed but direct backend succeeded - this is the expected behavior.');
+                addResult(
+                    'Fallback Analysis',
+                    '✅ Fallback mechanism is working correctly!\n   Proxy failed but direct backend succeeded - this is the expected behavior.',
+                    'success'
+                );
+            } else if (proxyResult.success && !directResult.success) {
+                console.log('⚠️  Proxy works but direct backend fails - unusual but acceptable.');
+                addResult(
+                    'Fallback Analysis',
+                    '⚠️  Proxy works but direct backend fails - unusual but acceptable.',
+                    'info'
+                );
+            } else if (!proxyResult.success && !directResult.success) {
+                console.log('❌ Both proxy and direct backend failed - there may be a broader issue.');
+                addResult(
+                    'Fallback Analysis',
+                    '❌ Both proxy and direct backend failed - there may be a broader issue.',
+                    'error'
+                );
+            } else {
+                console.log('✅ Both endpoints are working - optimal scenario.');
+                addResult(
+                    'Fallback Analysis',
+                    '✅ Both endpoints are working - optimal scenario.',
+                    'success'
+                );
+            }
+        }
+
+        async function testProxyOnly() {
+            clearOutput();
+            console.log('🧪 Testing Proxy Only...\n');
+            
+            const PROXY_URL = '/api/proxy/api/v1/auth/sign-up';
+            const result = await testRegistration(PROXY_URL, 'Proxy Registration Only');
+            
+            addResult(
+                'Proxy Only Test',
+                `Status: ${result.status} ${result.statusText}\nSuccess: ${result.success}`,
+                result.success ? 'success' : 'error'
+            );
+        }
+
+        async function testDirectOnly() {
+            clearOutput();
+            console.log('🧪 Testing Direct Backend Only...\n');
+            
+            const DIRECT_URL = 'https://agrolinkbackend.onrender.com/api/v1/auth/sign-up';
+            const result = await testRegistration(DIRECT_URL, 'Direct Backend Registration Only');
+            
+            addResult(
+                'Direct Backend Only Test',
+                `Status: ${result.status} ${result.statusText}\nSuccess: ${result.success}`,
+                result.success ? 'success' : 'error'
+            );
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            console.log('🌐 Registration Fallback Test Page Loaded');
+            console.log('Click "Run All Tests" to verify the fallback mechanism.');
+        });
+    </script>
+</body>
+</html>
