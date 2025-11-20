@@ -4,6 +4,7 @@ import appLogo from '../assets/logo.png'
 import NotificationsBell from './NotificationsBell'
 import { getCartCount, onCartChange } from '../services/cartService'
 import { useEffect, useState } from 'react'
+import SupportAssistant from './SupportAssistant'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-green-600 text-white' : 'text-gray-700 hover:bg-green-50 hover:text-green-700'}`
@@ -85,6 +86,7 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+      <SupportAssistant />
     </header>
   )
 }
