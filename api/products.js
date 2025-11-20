@@ -81,9 +81,9 @@ export default async function handler(req, res) {
     searchParams: Object.fromEntries(urlObj.searchParams)
   })
 
-  // For DELETE, skip backend entirely and go straight to Supabase
-  if (method === 'DELETE' && pathSuffix) {
-    console.log('[products] DELETE request - using Supabase directly')
+  // For write operations (POST/PATCH/DELETE), skip backend and go straight to Supabase
+  if (['POST', 'PATCH', 'DELETE'].includes(method)) {
+    console.log(`[products] ${method} request - using Supabase directly`)
     
     if (!supabaseUrl || !supabaseAnon) {
       res.status(502).json({ 
@@ -102,27 +102,60 @@ export default async function handler(req, res) {
         'Prefer': 'return=representation'
       }
 
-      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${pathSuffix}`
-      console.log('[products] Supabase DELETE:', supabaseEndpoint)
+      // Get request body for POST/PATCH
+      let body = null
+      if (['POST', 'PATCH'].includes(method)) {
+        const chunks = []
+        for await (const chunk of req) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        }
+        body = Buffer.concat(chunks)
+      }
+
+      let supabaseEndpoint
+      if (method === 'POST') {
+        supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products`
+      } else if (pathSuffix) {
+        supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${pathSuffix}`
+      } else {
+        res.status(400).json({ ok: false, error: 'Missing product ID' })
+        return
+      }
+
+      console.log(`[products] Supabase ${method}:`, supabaseEndpoint)
       
       const supabaseResp = await fetch(supabaseEndpoint, {
-        method: 'DELETE',
+        method,
         headers: supabaseHeaders,
+        body,
         signal: AbortSignal.timeout(15000)
       })
 
-      console.log('[products] Supabase DELETE response:', supabaseResp.status)
+      console.log(`[products] Supabase ${method} response:`, supabaseResp.status)
+      
       res.status(supabaseResp.status)
-      res.end()
+      
+      if (method === 'DELETE') {
+        res.end()
+      } else {
+        supabaseResp.headers.forEach((v, k) => {
+          const key = k.toLowerCase()
+          if (!['connection','keep-alive','transfer-encoding','host','content-encoding','content-length'].includes(key)) {
+            try { res.setHeader(k, v) } catch {}
+          }
+        })
+        const buf = Buffer.from(await supabaseResp.arrayBuffer())
+        res.end(buf)
+      }
       return
     } catch (e) {
-      console.error('[products] Supabase DELETE error:', e)
+      console.error(`[products] Supabase ${method} error:`, e)
       res.status(502).json({ ok: false, error: e.message })
       return
     }
   }
 
-  // Warmup backend BEFORE attempting main request
+  // For GET requests, try backend first with fallback to Supabase
   console.log('[products] Warming up backend before request...')
   await warmupBackend()
   await sleep(500) // Extra buffer time
