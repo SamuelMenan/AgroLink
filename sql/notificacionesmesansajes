@@ -385,3 +385,287 @@ BEGIN
 END $$;
 
 NOTIFY pgrst, 'reload schema';
+
+-- Habilitar RLS y política de INSERT para conversaciones
+alter table public.conversations enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public' and tablename='conversations' and policyname='conversations_insert'
+  ) then
+    create policy conversations_insert
+    on public.conversations
+    for insert
+    to authenticated
+    with check (true);
+  end if;
+end $$;
+
+-- Política de SELECT para ver conversaciones donde el usuario participa
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public' and tablename='conversations' and policyname='conversations_select'
+  ) then
+    create policy conversations_select
+    on public.conversations
+    for select
+    to authenticated
+    using (
+      exists (
+        select 1 from public.conversation_participants cp
+        where cp.conversation_id = id and cp.user_id = auth.uid()
+      )
+    );
+  end if;
+end $$;
+
+-- Helper y políticas para participants (añadirte y luego al otro usuario)
+create or replace function public.is_conversation_participant(conv_id uuid)
+returns boolean language sql stable security definer
+set search_path = public set row_security = off
+as $$
+  select exists (
+    select 1 from public.conversation_participants
+    where conversation_id = conv_id and user_id = auth.uid()
+  );
+$$;
+grant execute on function public.is_conversation_participant(uuid) to authenticated;
+
+alter table public.conversation_participants enable row level security;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname='conv_part_insert' and tablename='conversation_participants') then
+    create policy conv_part_insert
+    on public.conversation_participants
+    for insert to authenticated
+    with check (auth.uid() = user_id);
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname='conv_part_select_conv_visible' and tablename='conversation_participants') then
+    create policy conv_part_select_conv_visible
+    on public.conversation_participants
+    for select to authenticated
+    using (public.is_conversation_participant(conversation_id));
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname='conv_part_insert_add_other' and tablename='conversation_participants') then
+    create policy conv_part_insert_add_other
+    on public.conversation_participants
+    for insert to authenticated
+    with check (user_id = auth.uid() or public.is_conversation_participant(conversation_id));
+  end if;
+end $$;
+
+-- Opcional: recargar esquema de PostgREST
+NOTIFY pgrst, 'reload schema';
+
+alter table public.conversations enable row level security;
+
+do $$
+declare pol record;
+begin
+  for pol in
+    select policyname from pg_policies
+    where schemaname='public' and tablename='conversations' and cmd='insert'
+  loop
+    execute format('drop policy %I on public.conversations', pol.policyname);
+  end loop;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public' and tablename='conversations' and policyname='conversations_insert'
+  ) then
+    create policy conversations_insert
+    on public.conversations
+    for insert to authenticated
+    with check (true);
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public' and tablename='conversations' and policyname='conversations_select'
+  ) then
+    create policy conversations_select
+    on public.conversations
+    for select to authenticated
+    using (
+      exists (
+        select 1 from public.conversation_participants cp
+        where cp.conversation_id = id and cp.user_id = auth.uid()
+      )
+    );
+  end if;
+end $$;
+
+create or replace function public.is_conversation_participant(conv_id uuid)
+returns boolean language sql stable security definer
+set search_path = public set row_security = off
+as $$
+  select exists (
+    select 1 from public.conversation_participants
+    where conversation_id = conv_id and user_id = auth.uid()
+  );
+$$;
+grant execute on function public.is_conversation_participant(uuid) to authenticated;
+
+alter table public.conversation_participants enable row level security;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname='conv_part_insert' and tablename='conversation_participants') then
+    create policy conv_part_insert
+    on public.conversation_participants
+    for insert to authenticated
+    with check (auth.uid() = user_id);
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname='conv_part_select_conv_visible' and tablename='conversation_participants') then
+    create policy conv_part_select_conv_visible
+    on public.conversation_participants
+    for select to authenticated
+    using (public.is_conversation_participant(conversation_id));
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname='conv_part_insert_add_other' and tablename='conversation_participants') then
+    create policy conv_part_insert_add_other
+    on public.conversation_participants
+    for insert to authenticated
+    with check (user_id = auth.uid() or public.is_conversation_participant(conversation_id));
+  end if;
+end $$;
+
+NOTIFY pgrst, 'reload schema';
+
+select policyname, cmd from pg_policies where schemaname='public' and tablename='conversations';
+select policyname, cmd from pg_policies where schemaname='public' and tablename='conversation_participants';
+
+alter table public.conversations enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public' and tablename='conversations' and policyname='conversations_insert'
+  ) then
+    create policy conversations_insert
+    on public.conversations
+    for insert
+    to authenticated
+    with check (true);
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname='public' and tablename='conversations' and policyname='conversations_select'
+  ) then
+    create policy conversations_select
+    on public.conversations
+    for select
+    to authenticated
+    using (
+      exists (
+        select 1 from public.conversation_participants cp
+        where cp.conversation_id = id and cp.user_id = auth.uid()
+      )
+    );
+  end if;
+end $$;
+
+create or replace function public.is_conversation_participant(conv_id uuid)
+returns boolean language sql stable security definer
+set search_path = public set row_security = off
+as $$
+  select exists (
+    select 1 from public.conversation_participants
+    where conversation_id = conv_id and user_id = auth.uid()
+  );
+$$;
+grant execute on function public.is_conversation_participant(uuid) to authenticated;
+
+alter table public.conversation_participants enable row level security;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname='conv_part_insert' and tablename='conversation_participants') then
+    create policy conv_part_insert
+    on public.conversation_participants
+    for insert
+    to authenticated
+    with check (auth.uid() = user_id);
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname='conv_part_select_conv_visible' and tablename='conversation_participants') then
+    create policy conv_part_select_conv_visible
+    on public.conversation_participants
+    for select
+    to authenticated
+    using (public.is_conversation_participant(conversation_id));
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname='conv_part_insert_add_other' and tablename='conversation_participants') then
+    create policy conv_part_insert_add_other
+    on public.conversation_participants
+    for insert
+    to authenticated
+    with check (user_id = auth.uid() or public.is_conversation_participant(conversation_id));
+  end if;
+end $$;
+
+NOTIFY pgrst, 'reload schema';
+
+-- Asegura extensión UUID (opcional si ya existe)
+create extension if not exists pgcrypto;
+
+-- Activa RLS si aún no está activa
+alter table public.conversations enable row level security;
+
+-- Elimina cualquier policy INSERT anterior que pudiera causar conflictos
+DO $$
+DECLARE pol record;
+BEGIN
+  FOR pol IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname='public' AND tablename='conversations' AND cmd='insert'
+  LOOP
+    EXECUTE format('drop policy %I on public.conversations', pol.policyname);
+  END LOOP;
+END $$;
+
+-- Crea la política de INSERT abierta para usuarios autenticados
+CREATE POLICY conversations_insert
+  ON public.conversations
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- (Opcional) Política de SELECT si aún no la tienes (no afecta al INSERT)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='conversations' AND policyname='conversations_select'
+  ) THEN
+    CREATE POLICY conversations_select
+      ON public.conversations
+      FOR SELECT
+      TO authenticated
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.conversation_participants cp
+          WHERE cp.conversation_id = id AND cp.user_id = auth.uid()
+        )
+      );
+  END IF;
+END $$;
+
+-- Recarga el esquema para PostgREST
+NOTIFY pgrst, 'reload schema';
+
+-- Verifica
+SELECT policyname, cmd, roles FROM pg_policies
+WHERE schemaname='public' AND tablename='conversations';

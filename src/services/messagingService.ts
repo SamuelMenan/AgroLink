@@ -10,26 +10,49 @@ export type DecryptedMessage = Message & { content: string; status?: 'sent'|'del
 const API_BASE = '/api/v1'
 
 export async function ensureConversationWith(userId: string, otherUserId: string): Promise<Conversation> {
-  // List existing conversations for user and check if other user participates
-  const existing = await listConversations(userId)
-  for (const conv of existing) {
-    const parts = await getOtherParticipantIds(conv.id, userId)
-    if (parts.includes(otherUserId)) return conv
+  // Buscar conversaciones existentes (incluyendo aquellas donde el usuario es el único participante)
+  const existingIds = await listConversationIds(userId)
+  let selected: Conversation | undefined
+  let selectedParticipants: string[] = []
+  for (const id of existingIds) {
+    const participants = await getParticipantIds(id)
+    // Conversación ya con el otro usuario
+    if (participants.includes(otherUserId)) {
+      const convData = await fetchConversation(id)
+      if (convData) {
+        selected = convData
+        selectedParticipants = participants
+        break
+      }
+    }
+    // Reutilizar conversación “vacía” (solo usuario actual) si no encontramos otra
+    if (!selected && participants.length === 1 && participants[0] === userId) {
+      const convData = await fetchConversation(id)
+      if (convData) {
+        selected = convData
+        selectedParticipants = participants
+      }
+    }
   }
-  // Create new conversation
-  const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
-  if (!res.ok) {
-    const detail = await res.text().catch(()=> '')
-    if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
-    if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
-    throw new Error(`Error ${res.status} creando conversación`)
+
+  if (!selected) {
+    // Crear nueva conversación
+    const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
+    if (!res.ok) {
+      const detail = await res.text().catch(()=> '')
+      if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
+      if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
+      throw new Error(`Error ${res.status} creando conversación`)
+    }
+    const createdJson = await res.json()
+    selected = Array.isArray(createdJson) ? createdJson[0] : createdJson
+    selectedParticipants = []
   }
-  const createdJson = await res.json()
-  // El backend puede devolver arreglo de filas insertadas; tomamos la primera si aplica.
-  const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
-  // Add participants
+
+  // Añadir participantes necesarios sin provocar conflicto 409
   const add = async (uid: string) => {
-    const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
+    if (selectedParticipants.includes(uid)) return
+    const r = await apiFetch(`${API_BASE}/conversations/${selected!.id}/participants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: uid })
@@ -38,19 +61,46 @@ export async function ensureConversationWith(userId: string, otherUserId: string
       const detail = await r.text().catch(()=> '')
       if (r.status === 401) throw new Error('No autorizado al registrar participante')
       if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+      if (r.status === 409) return // Conflicto por carrera: ya existe
       throw new Error(`Error ${r.status} añadiendo participante`)
     }
+    selectedParticipants.push(uid)
   }
   await add(userId)
-  await add(otherUserId)
-  // Generate and store local key (E2EE demo)
-  const existingKey = getStoredKey(conv.id)
+  if (otherUserId !== userId) await add(otherUserId)
+
+  // Generar y guardar clave local (E2EE demo) si no existe todavía
+  const existingKey = getStoredKey(selected.id)
   if (!existingKey) {
     const key = await generateConversationKey()
     const b64 = await exportKeyBase64(key)
-    storeKey(conv.id, b64)
+    storeKey(selected.id, b64)
   }
-  return conv
+  return selected
+}
+
+// Helpers internos añadidos para evitar duplicados y conflictos
+async function listConversationIds(userId: string): Promise<string[]> {
+  const res = await apiFetch(`${API_BASE}/conversations/by-user/${userId}`)
+  if (!res.ok) return []
+  const rows = await res.json()
+  return (rows||[]).map((r: { conversation_id: string }) => r.conversation_id)
+}
+
+async function getParticipantIds(conversationId: string): Promise<string[]> {
+  const res = await apiFetch(`${API_BASE}/conversations/${conversationId}/participants`)
+  if (!res.ok) return []
+  const rows: { user_id: string }[] = await res.json()
+  return (rows||[]).map(r => r.user_id)
+}
+
+async function fetchConversation(id: string): Promise<Conversation | undefined> {
+  const r = await apiFetch(`${API_BASE}/conversations/${id}`)
+  if (!r.ok) return undefined
+  const json = await r.json()
+  const obj = Array.isArray(json) ? (json[0] ?? null) : json
+  if (obj && obj.id) return obj as Conversation
+  return undefined
 }
 
 export async function listConversations(userId: string): Promise<Conversation[]> {
