@@ -11,8 +11,5 @@
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*\\.(?:js|css|png|jpg|svg|json|map|ico))", "destination": "/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    { "path": "/api/warm", "schedule": "*/10 * * * *" }
   ]
 }
