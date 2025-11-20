@@ -93,7 +93,7 @@ export default function Register() {
     // Contraseña: 8+ una mayúscula, un número y un símbolo
     const pwd = form.password
     if (!pwd) e.password = 'La contraseña es obligatoria.'
-    else if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwd)) e.password = 'Mín 8, con mayúscula, número y símbolo.'
+    else if (!/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwd)) e.password = 'Debe tener 8+, mayúscula, minúscula, número y símbolo.'
 
     // Confirmación
     if (form.confirmPassword !== form.password) e.confirmPassword = 'Las contraseñas no coinciden.'
@@ -148,6 +148,17 @@ export default function Register() {
       setSubmitting(false)
     }
   }
+
+  const pwdCriteria = {
+    length: form.password.length >= 8,
+    upper: /[A-Z]/.test(form.password),
+    lower: /[a-z]/.test(form.password),
+    number: /\d/.test(form.password),
+    special: /[^A-Za-z0-9]/.test(form.password),
+  }
+  const pwdValid = pwdCriteria.length && pwdCriteria.upper && pwdCriteria.lower && pwdCriteria.number && pwdCriteria.special
+  const pwdScore = [pwdCriteria.length, pwdCriteria.upper, pwdCriteria.lower, pwdCriteria.number, pwdCriteria.special].filter(Boolean).length
+  const pwdStrength = pwdScore <= 2 ? 'Débil' : pwdScore <= 4 ? 'Mediana' : 'Fuerte'
 
   return (
     <main className="mx-auto max-w-md px-4 py-12">
@@ -206,6 +217,12 @@ export default function Register() {
               )}
             </button>
           </div>
+          <div className="mt-1 text-xs">
+            <span className={pwdValid ? 'text-green-700' : 'text-amber-700'}>Fuerza: {pwdStrength}</span>
+            {!pwdValid && (
+              <p className="mt-1 text-amber-700">La contraseña debe tener al menos 8 caracteres, con mayúscula, minúscula, número y símbolo.</p>
+            )}
+          </div>
           {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
         </div>
         <div>
@@ -254,7 +271,7 @@ export default function Register() {
             </a>
           </div>
         )}
-        <button disabled={submitting} type="submit" className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Creando cuenta…' : 'Registrarse'}</button>
+        <button disabled={submitting || !pwdValid} type="submit" className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Creando cuenta…' : 'Registrarse'}</button>
       </form>
 
       <div className="px-6 pb-6 md:px-8">
