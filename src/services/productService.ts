@@ -85,7 +85,11 @@ export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const res = await apiFetch(`/api/v1/products/${id}`, { method: 'DELETE' })
+  const res = await apiFetch(`/api/v1/products-delete`, { 
+    method: 'POST',
+    body: JSON.stringify({ id }),
+    headers: { 'Content-Type': 'application/json' }
+  })
   if (!res.ok) throw new Error('Error eliminando producto')
 }
 
