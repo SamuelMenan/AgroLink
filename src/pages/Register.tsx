@@ -29,9 +29,40 @@ export default function Register() {
   const nextParam = params.get('next') || '/dashboard'
   const intent = params.get('intent')
   const redirectAbs = useMemo(() => `${location.origin}${nextParam.startsWith('/') ? nextParam : '/dashboard'}`, [nextParam])
+  function formatPhoneColombia(digits: string) {
+    const d = digits.slice(0, 10)
+    if (d.length <= 3) return d
+    if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
+    return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`
+  }
+  function onPhoneKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const allowed = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+    if (allowed.includes(e.key)) return
+    if (!/^\d$/.test(e.key)) e.preventDefault()
+  }
+  function onPhonePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text') || ''
+    const digits = text.replace(/\D/g, '').slice(0, 10)
+    const formatted = formatPhoneColombia(digits)
+    setForm((f) => ({ ...f, phone: formatted }))
+  }
+  function onPhoneBlur() {
+    const digits = form.phone.replace(/\D/g, '')
+    setErrors((prev) => ({
+      ...prev,
+      phone: digits.length === 0 ? prev.phone : (digits.length === 10 ? undefined : 'Número no válido. Formato: XXX XXX XXXX.')
+    }))
+  }
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
+    if (name === 'phone') {
+      const digits = value.replace(/\D/g, '').slice(0, 10)
+      const formatted = formatPhoneColombia(digits)
+      setForm((f) => ({ ...f, phone: formatted }))
+      return
+    }
     const sanitized = type === 'checkbox' ? checked : value.replace(/^\s+/, '')
     setForm((f) => ({ ...f, [name]: sanitized }))
   }
@@ -47,9 +78,10 @@ export default function Register() {
     const email = form.email.trim()
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) e.email = 'Correo inválido.'
 
-    // Teléfono: numérico, máx 10 dígitos (ahora puede ser principal)
     if (form.phone) {
-      if (!/^\d{1,10}$/.test(form.phone)) e.phone = 'Solo números, máximo 10 dígitos.'
+      const digits = form.phone.replace(/\D/g, '')
+      if (digits.length !== 10) e.phone = 'Número no válido. Formato: XXX XXX XXXX.'
+      else if (!/^\d{3} \d{3} \d{4}$/.test(form.phone)) e.phone = 'Formato: XXX XXX XXXX.'
     }
     
     // Validar que al menos email o teléfono estén proporcionados
@@ -83,7 +115,7 @@ export default function Register() {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
-        phone: form.phone.trim() || undefined,
+        phone: form.phone.replace(/\D/g, '') || undefined,
       })
       if (error) {
         // Enhanced error handling for different scenarios
@@ -140,7 +172,7 @@ export default function Register() {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Número de teléfono (opcional)</label>
-          <input name="phone" value={form.phone} onChange={onChange} inputMode="numeric" pattern="[0-9]*" maxLength={10} autoComplete="username" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="phone" value={form.phone} onChange={onChange} onKeyDown={onPhoneKeyDown} onPaste={onPhonePaste} onBlur={onPhoneBlur} inputMode="numeric" pattern="\d{3} \d{3} \d{4}" maxLength={12} autoComplete="tel" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
           {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
         </div>
         <div>
