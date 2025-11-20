@@ -83,7 +83,25 @@ export default function Register() {
         phone: form.phone.trim() || undefined,
       })
       if (error) {
-        setErrors((prev) => ({ ...prev, email: error }))
+        // Enhanced error handling for different scenarios
+        if (error.includes('already registered') || error.includes('User already registered') || error.includes('user_already_exists')) {
+          setErrors((prev) => ({ 
+            ...prev, 
+            email: 'Este usuario ya está registrado. Por favor, inicia sesión o usa otro correo/teléfono.' 
+          }))
+        } else if (error.includes('network') || error.includes('Network')) {
+          setErrors((prev) => ({ 
+            ...prev, 
+            email: 'Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.' 
+          }))
+        } else if (error.includes('timeout') || error.includes('Timeout')) {
+          setErrors((prev) => ({ 
+            ...prev, 
+            email: 'La solicitud tardó demasiado tiempo. Por favor, intenta nuevamente.' 
+          }))
+        } else {
+          setErrors((prev) => ({ ...prev, email: error }))
+        }
         return
       }
       // Registro exitoso - navegar inmediatamente a /simple

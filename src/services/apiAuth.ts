@@ -147,9 +147,19 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
         if (res.status >= 400 && res.status < 500) {
           try {
             const json = JSON.parse(text);
+            
+            // Special handling for 422 user already exists error
+            if (res.status === 422 && json.error_code === 'user_already_exists') {
+              throw new Error(`Auth ${res.status}: Este usuario ya está registrado. Por favor, inicia sesión o usa otro correo/teléfono.`);
+            }
+            
             const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
             throw new Error(`Auth ${res.status}: ${detail}`);
-          } catch {
+          } catch (parseError) {
+            // If JSON parsing fails, still provide meaningful error
+            if (res.status === 422 && text.includes('user_already_exists')) {
+              throw new Error(`Auth ${res.status}: Este usuario ya está registrado. Por favor, inicia sesión o usa otro correo/teléfono.`);
+            }
             throw new Error(`Auth ${res.status}: ${text}`);
           }
         }

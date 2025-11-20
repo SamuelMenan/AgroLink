@@ -94,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let msg = e instanceof Error ? e.message : 'Error en el registro'
       
       // Provide more user-friendly error messages
-      if (msg.includes('400')) {
+      if (msg.includes('422') && msg.includes('user_already_exists')) {
+        msg = 'Este usuario ya está registrado. Por favor, inicia sesión o usa otro correo/teléfono.'
+      } else if (msg.includes('400')) {
         msg = 'Los datos del formulario no son válidos. Por favor, verifica tu información.'
       } else if (msg.includes('network') || msg.includes('Network')) {
         msg = 'Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.'
