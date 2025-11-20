@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import AssistantGuide from '../components/AssistantGuide'
 
 export default function SimpleHub() {
   return (
@@ -30,6 +31,8 @@ export default function SimpleHub() {
           <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">4</span><span>Entrega el producto y confirma la venta.</span></li>
         </ol>
       </section>
+
+      <AssistantGuide />
     </main>
   )
 }

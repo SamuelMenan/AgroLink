@@ -143,6 +143,7 @@ export default function Register() {
         return
       }
       // Registro exitoso - navegar inmediatamente a /simple
+      try { localStorage.setItem('agrolink_first_login', '1') } catch {}
       navigate('/simple', { replace: true })
     } catch (navError) {
       console.error('Error durante la navegación:', navError)
