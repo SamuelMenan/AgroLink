@@ -67,16 +67,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const resp = await signUp(fullName, email, password, phone)
       const u = deriveUserFromTokens(resp)
-      setUser(u)
+      
+      // Si hay un usuario válido, establecerlo
+      if (u) {
+        setUser(u)
+      }
+      
       // Si el backend exige confirmación por correo, puede faltar access_token.
       const needsEmailConfirmation = !resp.access_token
-      return { needsEmailConfirmation }
+      
+      // Si el usuario fue creado pero no hay tokens (caso 422), considerarlo como necesitando confirmación
+      return { needsEmailConfirmation: needsEmailConfirmation || !u }
     } catch (e) {
       let msg = e instanceof Error ? e.message : 'Error en el registro'
       
       // Provide more user-friendly error messages
       if (msg.includes('422')) {
-        msg = 'Este correo electrónico ya está registrado. Por favor, intenta iniciar sesión o usa otro correo.'
+        // 422 significa que el usuario fue creado pero hay algún problema adicional
+        return { needsEmailConfirmation: true }
       } else if (msg.includes('400')) {
         msg = 'Los datos del formulario no son válidos. Por favor, verifica tu información.'
       } else if (msg.includes('network') || msg.includes('Network')) {

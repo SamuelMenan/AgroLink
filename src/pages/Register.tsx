@@ -84,9 +84,17 @@ export default function Register() {
         return
       }
       if (needsEmailConfirmation) {
-        setInfo('Registro exitoso. Revisa tu correo para confirmar tu cuenta.')
+        setInfo('Registro exitoso. Revisa tu correo para confirmar tu cuenta. Después podrás iniciar sesión.')
+        // Redirigir al login después de unos segundos
+        setTimeout(() => {
+          navigate('/login', { replace: true })
+        }, 4000)
       } else {
-  navigate(nextParam || '/dashboard', { replace: true })
+        // Si no necesita confirmación, redirigir al login inmediatamente
+        setInfo('Registro exitoso. Ahora puedes iniciar sesión.')
+        setTimeout(() => {
+          navigate('/login', { replace: true })
+        }, 1500)
       }
     } finally {
       setSubmitting(false)
