@@ -30,6 +30,11 @@ async function warmupBackend() {
 export default async function handler(req, res) {
   const method = (req.method || 'GET').toUpperCase()
   
+  // Set CORS headers for all requests
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+  
   console.log('[products] Incoming request:', {
     method,
     url: req.url,
@@ -38,9 +43,6 @@ export default async function handler(req, res) {
   
   // Handle CORS preflight
   if (method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*')
     res.status(204).end()
     return
   }
@@ -285,4 +287,11 @@ export default async function handler(req, res) {
     console.error('[products] Handler error:', e)
     res.status(502).json({ ok: false, error: e.message || 'Request failed' })
   }
+}
+
+// Configure allowed methods for Vercel
+export const config = {
+  api: {
+    bodyParser: false,
+  },
 }
