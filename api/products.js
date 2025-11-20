@@ -81,6 +81,47 @@ export default async function handler(req, res) {
     searchParams: Object.fromEntries(urlObj.searchParams)
   })
 
+  // For DELETE, skip backend entirely and go straight to Supabase
+  if (method === 'DELETE' && pathSuffix) {
+    console.log('[products] DELETE request - using Supabase directly')
+    
+    if (!supabaseUrl || !supabaseAnon) {
+      res.status(502).json({ 
+        ok: false, 
+        error: 'Supabase not configured'
+      })
+      return
+    }
+
+    try {
+      const supabaseHeaders = {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'apikey': supabaseAnon,
+        'Authorization': req.headers.authorization || `Bearer ${supabaseAnon}`,
+        'Prefer': 'return=representation'
+      }
+
+      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${pathSuffix}`
+      console.log('[products] Supabase DELETE:', supabaseEndpoint)
+      
+      const supabaseResp = await fetch(supabaseEndpoint, {
+        method: 'DELETE',
+        headers: supabaseHeaders,
+        signal: AbortSignal.timeout(15000)
+      })
+
+      console.log('[products] Supabase DELETE response:', supabaseResp.status)
+      res.status(supabaseResp.status)
+      res.end()
+      return
+    } catch (e) {
+      console.error('[products] Supabase DELETE error:', e)
+      res.status(502).json({ ok: false, error: e.message })
+      return
+    }
+  }
+
   // Warmup backend BEFORE attempting main request
   console.log('[products] Warming up backend before request...')
   await warmupBackend()
