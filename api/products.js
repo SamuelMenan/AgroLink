@@ -3,13 +3,27 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 async function warmupBackend() {
   const backendUrl = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
+  console.log('[products] Starting backend warmup...')
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    const start = Date.now()
+    
     await fetch(`${backendUrl}/actuator/health`, { 
-      signal: AbortSignal.timeout(3000),
+      signal: controller.signal,
       headers: { 'User-Agent': 'AgroLink-Warmup' }
     })
-  } catch {
-    // Ignore warmup errors
+    
+    clearTimeout(timeout)
+    const elapsed = Date.now() - start
+    console.log(`[products] Backend warmup completed in ${elapsed}ms`)
+    
+    // Give backend extra time to fully initialize
+    if (elapsed < 2000) {
+      await sleep(1000)
+    }
+  } catch (e) {
+    console.warn('[products] Backend warmup failed:', e.message)
   }
 }
 
@@ -35,11 +49,13 @@ export default async function handler(req, res) {
   const pathSuffix = pathMatch ? pathMatch[1] : ''
   const queryString = urlObj.search
 
-  // Try backend first with warmup
-  try {
-    // Warmup backend in background for cold starts
-    warmupBackend().catch(() => {})
+  // Warmup backend BEFORE attempting main request
+  console.log('[products] Warming up backend before request...')
+  await warmupBackend()
+  await sleep(500) // Extra buffer time
 
+  // Try backend first
+  try {
     const backendEndpoint = `${backendUrl}/api/v1/products${pathSuffix ? `/${pathSuffix}` : ''}${queryString}`
     
     // Prepare headers from incoming request
@@ -58,14 +74,15 @@ export default async function handler(req, res) {
       body = Buffer.concat(chunks)
     }
 
-    // Try backend with retries
+    // Try backend with more retries and longer timeouts
     let backendResp
     let lastErr
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 15000)
+        const timeout = setTimeout(() => controller.abort(), 25000)
         
+        console.log(`[products] Attempt ${attempt + 1}/5 to backend: ${method} ${backendEndpoint}`)
         backendResp = await fetch(backendEndpoint, {
           method,
           headers: outgoingHeaders,
@@ -74,6 +91,7 @@ export default async function handler(req, res) {
         })
         
         clearTimeout(timeout)
+        console.log(`[products] Backend response: ${backendResp.status}`)
         
         // Success or client error (not a transient failure)
         if (backendResp.ok || (backendResp.status >= 400 && backendResp.status < 500)) {
@@ -81,16 +99,20 @@ export default async function handler(req, res) {
         }
         
         // Retry on 502/503/504
-        if ([502, 503, 504].includes(backendResp.status) && attempt < 2) {
-          await sleep(500 * (attempt + 1))
+        if ([502, 503, 504].includes(backendResp.status) && attempt < 4) {
+          const backoff = 1000 * (attempt + 1)
+          console.log(`[products] Retrying after ${backoff}ms...`)
+          await sleep(backoff)
           continue
         }
         
         break
       } catch (e) {
         lastErr = e
-        if (attempt < 2) {
-          await sleep(500 * (attempt + 1))
+        console.error(`[products] Backend attempt ${attempt + 1} failed:`, e.message)
+        if (attempt < 4) {
+          const backoff = 1000 * (attempt + 1)
+          await sleep(backoff)
           continue
         }
       }
@@ -110,21 +132,34 @@ export default async function handler(req, res) {
       return
     }
 
-    // Backend failed with 5xx or network error - fallback to direct Supabase for GET only
-    if (method === 'GET' && supabaseUrl && supabaseAnon) {
-      console.warn('[products] Backend failed, using Supabase fallback for GET')
-      
+    // Backend failed - fallback to direct Supabase for ALL operations
+    console.warn('[products] Backend unavailable after retries, using Supabase fallback')
+    
+    if (!supabaseUrl || !supabaseAnon) {
+      res.status(502).json({ 
+        ok: false, 
+        error: 'Backend unavailable and Supabase not configured',
+        details: lastErr ? lastErr.message : 'Connection failed'
+      })
+      return
+    }
+
+    // Handle Supabase fallback based on method
+    const supabaseHeaders = {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'apikey': supabaseAnon,
+      'Authorization': req.headers.authorization || `Bearer ${supabaseAnon}`,
+      'Prefer': 'return=representation'
+    }
+
+    if (method === 'GET') {
       const q = urlObj.searchParams.get('q') || ''
       const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products${q ? (q.startsWith('?') ? q : `?${q}`) : ''}`
       
       const supabaseResp = await fetch(supabaseEndpoint, {
-        headers: {
-          'accept': 'application/json',
-          'content-type': 'application/json',
-          'apikey': supabaseAnon,
-          'Authorization': `Bearer ${supabaseAnon}`,
-        },
-        signal: AbortSignal.timeout(9000)
+        headers: supabaseHeaders,
+        signal: AbortSignal.timeout(15000)
       })
 
       res.status(supabaseResp.status)
@@ -139,12 +174,66 @@ export default async function handler(req, res) {
       return
     }
 
-    // No fallback available for POST/PATCH/DELETE or Supabase not configured
-    res.status(502).json({ 
-      ok: false, 
-      error: 'Backend unavailable and no fallback for this operation',
-      details: lastErr ? lastErr.message : 'Connection failed'
-    })
+    if (method === 'POST') {
+      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products`
+      
+      const supabaseResp = await fetch(supabaseEndpoint, {
+        method: 'POST',
+        headers: supabaseHeaders,
+        body,
+        signal: AbortSignal.timeout(15000)
+      })
+
+      res.status(supabaseResp.status)
+      supabaseResp.headers.forEach((v, k) => {
+        const key = k.toLowerCase()
+        if (!['connection','keep-alive','transfer-encoding','host','content-encoding','content-length'].includes(key)) {
+          try { res.setHeader(k, v) } catch {}
+        }
+      })
+      const buf = Buffer.from(await supabaseResp.arrayBuffer())
+      res.end(buf)
+      return
+    }
+
+    if (method === 'PATCH' && pathSuffix) {
+      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${pathSuffix}`
+      
+      const supabaseResp = await fetch(supabaseEndpoint, {
+        method: 'PATCH',
+        headers: supabaseHeaders,
+        body,
+        signal: AbortSignal.timeout(15000)
+      })
+
+      res.status(supabaseResp.status)
+      supabaseResp.headers.forEach((v, k) => {
+        const key = k.toLowerCase()
+        if (!['connection','keep-alive','transfer-encoding','host','content-encoding','content-length'].includes(key)) {
+          try { res.setHeader(k, v) } catch {}
+        }
+      })
+      const buf = Buffer.from(await supabaseResp.arrayBuffer())
+      res.end(buf)
+      return
+    }
+
+    if (method === 'DELETE' && pathSuffix) {
+      const supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${pathSuffix}`
+      
+      const supabaseResp = await fetch(supabaseEndpoint, {
+        method: 'DELETE',
+        headers: supabaseHeaders,
+        signal: AbortSignal.timeout(15000)
+      })
+
+      res.status(supabaseResp.status)
+      res.end()
+      return
+    }
+
+    // Unsupported operation
+    res.status(400).json({ ok: false, error: 'Unsupported operation' })
     
   } catch (e) {
     console.error('[products] Handler error:', e)

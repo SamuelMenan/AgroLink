@@ -95,24 +95,24 @@ function fetchWithTimeout(fetchImpl: FetchLike, input: RequestInfo | URL, init: 
   return fetchImpl(input, merged).finally(() => clearTimeout(id))
 }
 
-async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string, directUrlBase: string) {
+async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string) {
   // Best effort: ping health endpoints to wake Render. Ignore errors.
   try {
     await fetchImpl(`${proxyUrlBase}/actuator/health`, { cache: 'no-store' })
+    await new Promise(r => setTimeout(r, 500)) // Give it time to stabilize
   } catch { /* ignore */ }
   try {
     await fetchImpl(`/api/warm`, { cache: 'no-store' })
   } catch { /* ignore */ }
-  // Only attempt cross-origin warm-up if the frontend and backend share origin; otherwise it just produces CORS noise.
-  if (typeof window === 'undefined' || directUrlBase.startsWith(window.location.origin)) {
-    try {
-      await fetchImpl(`${directUrlBase}/actuator/health`, { cache: 'no-store' })
-    } catch { /* ignore */ }
-  }
 }
 
-// Direct fallback fetch that bypasses the proxy
+// Direct fallback fetch that bypasses the proxy - DISABLED for products to avoid CORS
 async function directFetch(path: string, init: RequestInit, headers: Headers, fetchImpl: FetchLike): Promise<Response> {
+  // Skip direct fetch for /api/v1/products to avoid CORS issues
+  if (path.includes('/api/v1/products')) {
+    throw new Error('Direct fetch disabled for products endpoint to avoid CORS')
+  }
+  
   const directUrl = `${BASE_URL}${path}`
   try {
     console.warn('[apiFetch] Attempting direct fetch to backend:', directUrl)
@@ -187,8 +187,13 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       // Primary attempt: proxy same-origin
       const primary = proxyUrl
       lastUrlTried = primary
-      console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary)
-      let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 12000)
+      
+      // Increase timeout for product operations
+      const isProductOp = path.includes('/api/v1/products')
+      const timeout = isProductOp ? 30000 : 12000
+      
+      console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary, `timeout: ${timeout}ms`)
+      let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, timeout)
       
       // If proxy fails with 405/502/503/504, immediately try direct fetch (if endpoint supports CORS)
       if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
@@ -262,7 +267,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         // Enhanced retry with exponential backoff and pre-warming
         const backoffMs = calculateBackoff(attempt, 600)
         console.warn(`[apiFetch] Retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path} (status: ${res.status})`)
-        await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
+        await warmupBackend(fetchImpl, '/api/proxy')
         await sleep(backoffMs)
         continue
       }
@@ -317,7 +322,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         // Enhanced retry for network/timeout errors
         const backoffMs = calculateBackoff(attempt, 700)
         console.warn(`[apiFetch] Network retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path}`, e)
-        await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
+        await warmupBackend(fetchImpl, '/api/proxy')
         await sleep(backoffMs)
         continue
       }
