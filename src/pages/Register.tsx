@@ -30,10 +30,11 @@ export default function Register() {
   const intent = params.get('intent')
   const redirectAbs = useMemo(() => `${location.origin}${nextParam.startsWith('/') ? nextParam : '/dashboard'}`, [nextParam])
   function formatPhoneColombia(digits: string) {
-    const d = digits.slice(0, 10)
+    const d = digits.slice(0, 15)
     if (d.length <= 3) return d
     if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`
-    return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`
+    if (d.length <= 10) return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`
+    return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 10)} ${d.slice(10)}`
   }
   function onPhoneKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     const allowed = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
@@ -43,7 +44,7 @@ export default function Register() {
   function onPhonePaste(e: React.ClipboardEvent<HTMLInputElement>) {
     e.preventDefault()
     const text = e.clipboardData.getData('text') || ''
-    const digits = text.replace(/\D/g, '').slice(0, 10)
+    const digits = text.replace(/\D/g, '').slice(0, 15)
     const formatted = formatPhoneColombia(digits)
     setForm((f) => ({ ...f, phone: formatted }))
   }
@@ -51,14 +52,14 @@ export default function Register() {
     const digits = form.phone.replace(/\D/g, '')
     setErrors((prev) => ({
       ...prev,
-      phone: digits.length === 0 ? prev.phone : (digits.length === 10 ? undefined : 'Número no válido. Formato: XXX XXX XXXX.')
+      phone: digits.length === 0 ? prev.phone : ((digits.length >= 10 && digits.length <= 15) ? undefined : 'Entre 10 y 15 dígitos.')
     }))
   }
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
     if (name === 'phone') {
-      const digits = value.replace(/\D/g, '').slice(0, 10)
+      const digits = value.replace(/\D/g, '').slice(0, 15)
       const formatted = formatPhoneColombia(digits)
       setForm((f) => ({ ...f, phone: formatted }))
       return
@@ -70,18 +71,18 @@ export default function Register() {
   function validate(): boolean {
     const e: Partial<Record<keyof Form, string>> = {}
 
-    // Nombre completo: no vacío y <= 50
+    // Nombre completo: no vacío y <= 100
     if (!form.fullName.trim()) e.fullName = 'El nombre completo es obligatorio.'
-    else if (form.fullName.trim().length > 50) e.fullName = 'Máximo 50 caracteres.'
+    else if (form.fullName.length > 100) e.fullName = 'Máximo 100 caracteres.'
 
-  // Email: opcional, pero si se proporciona debe tener formato válido
+  // Email: opcional, pero si se proporciona debe tener formato válido y <= 50
     const email = form.email.trim()
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email)) e.email = 'Correo inválido.'
+    if (form.email.length > 50) e.email = 'Máximo 50 caracteres.'
 
     if (form.phone) {
       const digits = form.phone.replace(/\D/g, '')
-      if (digits.length !== 10) e.phone = 'Número no válido. Formato: XXX XXX XXXX.'
-      else if (!/^\d{3} \d{3} \d{4}$/.test(form.phone)) e.phone = 'Formato: XXX XXX XXXX.'
+      if (digits.length < 10 || digits.length > 15) e.phone = 'Entre 10 y 15 dígitos.'
     }
     
     // Validar que al menos email o teléfono estén proporcionados
@@ -93,10 +94,12 @@ export default function Register() {
     // Contraseña: 8+ una mayúscula, un número y un símbolo
     const pwd = form.password
     if (!pwd) e.password = 'La contraseña es obligatoria.'
+    else if (pwd.length > 20) e.password = 'Máximo 20 caracteres.'
     else if (!/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pwd)) e.password = 'Debe tener 8+, mayúscula, minúscula, número y símbolo.'
 
     // Confirmación
-    if (form.confirmPassword !== form.password) e.confirmPassword = 'Las contraseñas no coinciden.'
+    if (form.confirmPassword.length > 20) e.confirmPassword = 'Máximo 20 caracteres.'
+    else if (form.confirmPassword !== form.password) e.confirmPassword = 'Las contraseñas no coinciden.'
 
     // Términos
     if (!form.terms) e.terms = 'Debes aceptar los términos y condiciones.'
@@ -173,17 +176,20 @@ export default function Register() {
         <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre completo</label>
-          <input name="fullName" value={form.fullName} onChange={onChange} type="text" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="fullName" value={form.fullName} onChange={onChange} type="text" maxLength={100} className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <p className="mt-1 text-xs text-gray-500">{form.fullName.length}/100</p>
           {errors.fullName && <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Correo electrónico (opcional)</label>
-          <input name="email" value={form.email} onChange={onChange} type="email" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="email" value={form.email} onChange={onChange} type="email" maxLength={50} className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <p className="mt-1 text-xs text-gray-500">{form.email.length}/50</p>
           {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Número de teléfono (opcional)</label>
-          <input name="phone" value={form.phone} onChange={onChange} onKeyDown={onPhoneKeyDown} onPaste={onPhonePaste} onBlur={onPhoneBlur} inputMode="numeric" pattern="\d{3} \d{3} \d{4}" maxLength={12} autoComplete="tel" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <input name="phone" value={form.phone} onChange={onChange} onKeyDown={onPhoneKeyDown} onPaste={onPhonePaste} onBlur={onPhoneBlur} inputMode="numeric" maxLength={19} autoComplete="tel" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <p className="mt-1 text-xs text-gray-500">{form.phone.replace(/\D/g, '').length}/15 dígitos</p>
           {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
         </div>
         <div>
@@ -195,6 +201,7 @@ export default function Register() {
               onChange={onChange}
               type={showPwd ? 'text' : 'password'}
               autoComplete="new-password"
+              maxLength={20}
               className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 pr-10 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
             />
             <button
@@ -217,6 +224,7 @@ export default function Register() {
               )}
             </button>
           </div>
+          <p className="mt-1 text-xs text-gray-500">{form.password.length}/20</p>
           <div className="mt-1 text-xs">
             <span className={pwdValid ? 'text-green-700' : 'text-amber-700'}>Fuerza: {pwdStrength}</span>
             {!pwdValid && (
@@ -234,6 +242,7 @@ export default function Register() {
               onChange={onChange}
               type={showConfirmPwd ? 'text' : 'password'}
               autoComplete="new-password"
+              maxLength={20}
               className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 pr-10 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
             />
             <button
@@ -256,6 +265,7 @@ export default function Register() {
               )}
             </button>
           </div>
+          <p className="mt-1 text-xs text-gray-500">{form.confirmPassword.length}/20</p>
           {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
         </div>
         <div className="flex items-start gap-2">
