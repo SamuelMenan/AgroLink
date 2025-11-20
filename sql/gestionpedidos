@@ -19,6 +19,30 @@ create index if not exists idx_orders_seller_status on public.orders(seller_id, 
 create index if not exists idx_orders_buyer_status on public.orders(buyer_id, status);
 create index if not exists idx_orders_created on public.orders(created_at desc);
 
+create or replace function public.ensure_orders_fks() returns void
+language plpgsql
+as '
+begin
+  if not exists (select 1 from pg_constraint where conname = ''orders_product_fk'') then
+    alter table public.orders
+      add constraint orders_product_fk foreign key (product_id)
+      references public.products(id) on delete restrict;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = ''orders_seller_fk'') then
+    alter table public.orders
+      add constraint orders_seller_fk foreign key (seller_id)
+      references auth.users(id) on delete cascade;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = ''orders_buyer_fk'') then
+    alter table public.orders
+      add constraint orders_buyer_fk foreign key (buyer_id)
+      references auth.users(id) on delete cascade;
+  end if;
+end;
+';
+
+select public.ensure_orders_fks();
+
 -- 2) RLS
 alter table public.orders enable row level security;
 -- Policies

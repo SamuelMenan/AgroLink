@@ -82,6 +82,7 @@ create table if not exists public.conversation_participants (
   primary key (conversation_id, user_id)
 );
 create index if not exists idx_conv_part_user on public.conversation_participants(user_id);
+create index if not exists idx_conv_part_conv on public.conversation_participants(conversation_id);
 
 -- Messages (ciphertext)
 create table if not exists public.messages (
@@ -95,6 +96,7 @@ create table if not exists public.messages (
   deleted_for_audit boolean default false
 );
 create index if not exists idx_messages_conv_created on public.messages(conversation_id, created_at);
+create index if not exists idx_messages_sender on public.messages(sender_id);
 
 -- Message receipts: delivered/read per user
 create table if not exists public.message_receipts (
@@ -158,7 +160,7 @@ as $$
     where cp.conversation_id = conv_id and cp.user_id = auth.uid()
   );
 $$;
-Este es tu producto.
+
 grant execute on function public.is_conversation_participant(uuid) to authenticated;
 
 -- Participants policies
@@ -367,17 +369,17 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND schemaname='storage' AND policyname = 'message_attachments_insert') THEN
     CREATE POLICY message_attachments_insert ON storage.objects FOR INSERT TO authenticated WITH CHECK (
-      bucket_id = 'message-attachments' AND (storage.foldername(name))[1] = auth.uid()::text
+      bucket_id = 'message-attachments' AND split_part(name, '/', 1) = auth.uid()::text
     );
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND schemaname='storage' AND policyname = 'message_attachments_update') THEN
     CREATE POLICY message_attachments_update ON storage.objects FOR UPDATE TO authenticated USING (
-      bucket_id = 'message-attachments' AND (storage.foldername(name))[1] = auth.uid()::text
+      bucket_id = 'message-attachments' AND split_part(name, '/', 1) = auth.uid()::text
     );
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND schemaname='storage' AND policyname = 'message_attachments_delete') THEN
     CREATE POLICY message_attachments_delete ON storage.objects FOR DELETE TO authenticated USING (
-      bucket_id = 'message-attachments' AND (storage.foldername(name))[1] = auth.uid()::text
+      bucket_id = 'message-attachments' AND split_part(name, '/', 1) = auth.uid()::text
     );
   END IF;
 END $$;

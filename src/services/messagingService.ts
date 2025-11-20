@@ -18,7 +18,12 @@ export async function ensureConversationWith(userId: string, otherUserId: string
   }
   // Create new conversation
   const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
-  if (!res.ok) throw new Error('No se pudo crear conversación')
+  if (!res.ok) {
+    const detail = await res.text().catch(()=> '')
+    if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
+    if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
+    throw new Error(`Error ${res.status} creando conversación`)
+  }
   const createdJson = await res.json()
   // El backend puede devolver arreglo de filas insertadas; tomamos la primera si aplica.
   const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
@@ -29,7 +34,12 @@ export async function ensureConversationWith(userId: string, otherUserId: string
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: uid })
     })
-    if (!r.ok) throw new Error('No se pudo añadir participante')
+    if (!r.ok) {
+      const detail = await r.text().catch(()=> '')
+      if (r.status === 401) throw new Error('No autorizado al registrar participante')
+      if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+      throw new Error(`Error ${r.status} añadiendo participante`)
+    }
   }
   await add(userId)
   await add(otherUserId)
@@ -136,7 +146,12 @@ export async function sendMessage(conversationId: string, senderId: string, text
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
     })
-    if (!res.ok) throw new Error('No se pudo enviar mensaje')
+    if (!res.ok) {
+      const detail = await res.text().catch(()=> '')
+      if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
+      if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
+      throw new Error(`Error ${res.status} enviando mensaje`)
+    }
     return
   } else {
     // Con clave local: cifrar en cliente
@@ -147,7 +162,12 @@ export async function sendMessage(conversationId: string, senderId: string, text
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
     })
-    if (!res.ok) throw new Error('No se pudo enviar mensaje')
+    if (!res.ok) {
+      const detail = await res.text().catch(()=> '')
+      if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
+      if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
+      throw new Error(`Error ${res.status} enviando mensaje`)
+    }
   }
 }
 

@@ -34,15 +34,15 @@ alter table public.user_profiles enable row level security;
 -- Propietario puede administrar su perfil (evitar IF NOT EXISTS, usar DROP + CREATE)
 drop policy if exists up_user_profiles_self on public.user_profiles;
 create policy up_user_profiles_self on public.user_profiles
-  for select using (auth.uid() = user_id);
+  for select to authenticated using (auth.uid() = user_id);
 
 drop policy if exists ins_user_profiles_self on public.user_profiles;
 create policy ins_user_profiles_self on public.user_profiles
-  for insert with check (auth.uid() = user_id);
+  for insert to authenticated with check (auth.uid() = user_id);
 
 drop policy if exists upd_user_profiles_self on public.user_profiles;
 create policy upd_user_profiles_self on public.user_profiles
-  for update using (auth.uid() = user_id);
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Trigger para updated_at
 create or replace function public.set_timestamp_updated_at()
