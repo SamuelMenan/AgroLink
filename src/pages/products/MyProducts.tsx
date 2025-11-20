@@ -24,6 +24,14 @@ export default function MyProducts() {
           const msg = e instanceof Error ? e.message : 'Error cargando productos'
           if (msg.includes('502') || msg.includes('503') || msg.includes('504') || msg.includes('unavailable')) {
             setError('El servidor está arrancando. Espera unos segundos y recarga la página.')
+          } else if (msg.includes('storage') || msg.includes('bucket') || msg.includes('image')) {
+            setError('Error al cargar imágenes de productos. Algunas imágenes pueden no estar disponibles.')
+          } else if (msg.includes('timeout')) {
+            setError('La carga de productos está tardando demasiado. Intenta recargar la página.')
+          } else if (msg.includes('404')) {
+            setError('No se encontraron productos.')
+          } else if (msg.includes('unauthorized') || msg.includes('permission')) {
+            setError('No tienes permisos para ver estos productos.')
           } else {
             setError(msg)
           }
@@ -42,8 +50,23 @@ export default function MyProducts() {
       await deleteProduct(id)
       setItems(prev => prev.filter(p => p.id !== id))
     } catch (e) {
-      console.error(e)
-      alert('Error eliminando producto')
+      console.error('Error eliminando producto:', e)
+      const error = e as any
+      
+      // Handle specific storage bucket errors
+      if (error.message?.includes('storage') || error.message?.includes('bucket')) {
+        alert('Error al eliminar imágenes del producto. El producto puede tener imágenes almacenadas que no se pudieron eliminar.')
+      } else if (error.message?.includes('404')) {
+        alert('Producto no encontrado. Puede que ya haya sido eliminado.')
+        // Remove from local state if product doesn't exist
+        setItems(prev => prev.filter(p => p.id !== id))
+      } else if (error.message?.includes('unauthorized') || error.message?.includes('permission')) {
+        alert('No tienes permisos para eliminar este producto.')
+      } else if (error.message?.includes('network') || error.message?.includes('timeout')) {
+        alert('Error de conexión. Por favor, intenta nuevamente.')
+      } else {
+        alert('Error eliminando producto: ' + (error.message || 'Error desconocido'))
+      }
     }
   }
 

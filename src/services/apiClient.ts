@@ -188,9 +188,9 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       const primary = proxyUrl
       lastUrlTried = primary
       
-      // Increase timeout for product operations
+      // Increase timeout for product operations (reduced from 30s to 8s for better UX)
       const isProductOp = path.includes('/api/v1/products')
-      const timeout = isProductOp ? 30000 : 12000
+      const timeout = isProductOp ? 8000 : 12000
       
       console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary, `timeout: ${timeout}ms`)
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, timeout)
