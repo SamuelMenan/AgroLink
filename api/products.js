@@ -125,8 +125,8 @@ export default async function handler(req, res) {
         clearTimeout(timeout)
         console.log(`[products] Backend response: ${backendResp.status}`)
         
-        // Success or client error (not a transient failure)
-        if (backendResp.ok || (backendResp.status >= 400 && backendResp.status < 500)) {
+        // Success or client error (except 405 which indicates backend routing issue)
+        if (backendResp.ok || (backendResp.status >= 400 && backendResp.status < 500 && backendResp.status !== 405)) {
           break
         }
         
@@ -150,8 +150,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // If backend succeeded, return its response
-    if (backendResp && (backendResp.ok || (backendResp.status >= 400 && backendResp.status < 500))) {
+    // If backend succeeded, return its response (but not 405 errors)
+    if (backendResp && backendResp.status !== 405 && (backendResp.ok || (backendResp.status >= 400 && backendResp.status < 500))) {
       res.status(backendResp.status)
       backendResp.headers.forEach((value, key) => {
         const k = key.toLowerCase()
