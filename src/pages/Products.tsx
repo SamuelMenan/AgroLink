@@ -21,6 +21,14 @@ export default function Products() {
   const debounced = useDebouncedValue(filtersRaw, 350)
 
   useEffect(()=>{
+    ;(async ()=>{
+      try {
+        await fetch('/api/proxy/actuator/health', { cache: 'no-store' })
+      } catch {}
+    })()
+  }, [])
+
+  useEffect(()=>{
     let alive = true
     async function run(){
       setLoading(true); setError(null)
@@ -166,7 +174,9 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       await contactUser(user.id, p.user_id, text)
       setMsgSent(true)
     } catch (e) {
-      const m = e instanceof Error ? e.message : 'No fue posible enviar el mensaje'
+      let m = e instanceof Error ? e.message : 'No fue posible enviar el mensaje'
+      const is5xx = /\b5\d{2}\b/.test(m) || /Error\s+5\d\d/.test(m)
+      if (is5xx) m = 'Estamos iniciando el servidor, intenta de nuevo en unos segundos'
       setErr(m)
     } finally {
       setSendingMsg(false)

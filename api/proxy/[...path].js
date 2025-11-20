@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
   const makeRequest = async () => {
     const controller = new AbortController()
-    const id = setTimeout(() => controller.abort(), 8000)
+    const id = setTimeout(() => controller.abort(), 20000)
     try {
       let body
       if (!['GET','HEAD'].includes(method.toUpperCase())) {
@@ -57,13 +57,13 @@ export default async function handler(req, res) {
 
   let resp
   let attempt = 0
-  const max = 3
+  const max = 4
   let lastErr
   for (; attempt < max; attempt++) {
     try {
       resp = await makeRequest()
       if ([502,503,504].includes(resp.status) && attempt < max - 1) {
-        await sleep(300 * (attempt + 1))
+        await sleep(600 * (attempt + 1))
         continue
       }
       break

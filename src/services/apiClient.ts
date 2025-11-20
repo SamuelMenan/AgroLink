@@ -53,7 +53,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
 
-  const maxRetries = 7
+  const maxRetries = 8
   let lastError: unknown = null
   let lastUrlTried = directUrl
 
@@ -62,14 +62,14 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       // Primary attempt: proxy same-origin
       const primary = proxyUrl
       lastUrlTried = primary
-      let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 10000)
+      let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 20000)
       // Si falla (405/5xx), intentar directo al backend solo si es mismo origen
       if (!res.ok && [502, 503, 504, 405].includes(res.status)) {
         const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         if (sameOrigin) {
           try {
             lastUrlTried = directUrl
-            res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 10000)
+            res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 20000)
           } catch (e2) {
             lastError = e2
           }
@@ -77,7 +77,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
         await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
-        await sleep(300 * (attempt + 1) * 2)
+        await sleep(600 * (attempt + 1))
         continue
       }
       return res
@@ -85,7 +85,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       lastError = e
       if (attempt < maxRetries - 1) {
         await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
-        await sleep(300 * (attempt + 1) * 2)
+        await sleep(600 * (attempt + 1))
         continue
       }
     }

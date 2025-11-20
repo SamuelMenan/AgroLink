@@ -145,18 +145,21 @@ async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAu
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-up`, { email, password, data: { full_name: fullName, phone } });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
+  try { await warmupProxy(); } catch {}
   return resp;
 }
 
 export async function signInEmail(email: string, password: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
+  try { await warmupProxy(); } catch {}
   return resp;
 }
 
 export async function signInPhone(phone: string, password: string) {
   const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
   if (resp.access_token && resp.refresh_token) setTokens(resp);
+  try { await warmupProxy(); } catch {}
   return resp;
 }
 
