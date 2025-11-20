@@ -84,18 +84,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         setUser(u)
       } else if (!resp.access_token) {
-        // Warning cuando Supabase no devuelve tokens
-        console.warn('Supabase no devolvió tokens - sesión limitada')
+        // Supabase no devolvió tokens (probable confirmación activada o respuesta parcial)
+        console.warn('[AuthContext] Supabase no devolvió tokens en sign-up. Intentando sign-in inmediato.')
+        try {
+          const signinResp = await signInEmail(email, password)
+          const u2 = deriveUserFromTokens(signinResp)
+          if (u2) setUser(u2)
+        } catch (signinErr) {
+          console.warn('[AuthContext] sign-in inmediato tras falta de tokens falló', signinErr)
+        }
       }
-      
-      // Siempre devolver objeto vacío cuando falten tokens
       return {}
     } catch (e) {
       let msg = e instanceof Error ? e.message : 'Error en el registro'
       
       // Provide more user-friendly error messages
-      if (msg.includes('422') && msg.includes('user_already_exists')) {
-        msg = 'Este usuario ya está registrado. Por favor, inicia sesión o usa otro correo/teléfono.'
+      if (/(422|user_already_exists|already registered|ya está registrado)/i.test(msg)) {
+        // Intentar sign-in automático al detectar duplicado (posible segundo POST)
+        try {
+          const signinResp = await signInEmail(email, password)
+          const uDup = deriveUserFromTokens(signinResp)
+          if (uDup) {
+            setUser(uDup)
+            return {}
+          }
+        } catch (dupErr) {
+          console.warn('[AuthContext] sign-in fallback tras 422 falló', dupErr)
+        }
+        msg = 'Este usuario ya está registrado. Inicia sesión o usa otro correo/teléfono.'
       } else if (msg.includes('400')) {
         msg = 'Los datos del formulario no son válidos. Por favor, verifica tu información.'
       } else if (msg.includes('network') || msg.includes('Network')) {

@@ -68,7 +68,9 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
 
-  const maxRetries = 2;
+  // Evitar duplicar creación de usuario: en sign-up sólo 1 intento para prevenir 422 por doble POST
+  const isSignUp = /\/sign-up$/.test(path)
+  const maxRetries = isSignUp ? 1 : 2;
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -84,7 +86,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
         body: JSON.stringify(body) 
       }, 8000) // Increased timeout to 8s
       // Si falla (405/5xx), intentar backend directo
-      if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
+      if (!res.ok && [405, 502, 503, 504].includes(res.status) && !isSignUp) {
         console.warn(`[apiAuth] Proxy failed with ${res.status}, attempting direct backend`, {
           endpoint: path,
           status: res.status,
@@ -155,7 +157,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
             
             const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
             throw new Error(`Auth ${res.status}: ${detail}`);
-          } catch (parseError) {
+          } catch {
             // If JSON parsing fails, still provide meaningful error
             if (res.status === 422 && text.includes('user_already_exists')) {
               throw new Error(`Auth ${res.status}: Este usuario ya está registrado. Por favor, inicia sesión o usa otro correo/teléfono.`);
@@ -245,7 +247,7 @@ async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAu
 
 export async function signUp(fullName: string, email: string, password: string, phone?: string) {
   // Support phone-only registration - backend will generate email if needed
-  const payload: any = { password, data: { full_name: fullName } };
+  const payload: Record<string, unknown> = { password, data: { full_name: fullName } };
   
   if (email && email.trim()) {
     payload.email = email;
