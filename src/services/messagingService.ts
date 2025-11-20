@@ -57,51 +57,37 @@ export async function ensureConversationWith(userId: string, otherUserId: string
   // Añadir participantes necesarios sin provocar conflicto 409
   const add = async (uid: string) => {
     if (selectedParticipants.includes(uid)) return
-    let lastError: Error | null = null
-    const maxRetries = 3
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const r = await apiFetch(`${API_BASE}/conversations/${selected.id}/participants`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: uid })
-        })
-        
-        if (!r.ok) {
-          const detail = await r.text().catch(()=> '')
-          if (r.status === 401) throw new Error('No autorizado al registrar participante')
-          if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
-          if (r.status === 409) return // Conflicto por carrera: ya existe
-          
-          // Handle 502/503/504 with retry logic
-          if ([502, 503, 504].includes(r.status) && attempt < maxRetries) {
-            console.warn(`[addParticipant] Attempt ${attempt}/${maxRetries} failed with ${r.status}, retrying...`)
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Linear backoff
-            continue
-          }
-          
-          throw new Error(`Error ${r.status} añadiendo participante`)
-        }
-        
-        selectedParticipants.push(uid)
-        return // Success
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error('Unknown error')
-        
-        // If it's a circuit breaker error or persistent 502, queue the participant
-        if ((lastError.message.includes('Circuit breaker') || lastError.message.includes('Service temporarily unavailable') || lastError.message.includes('502')) && attempt === maxRetries) {
-          console.warn(`[addParticipant] Queuing participant ${uid} due to service unavailability`)
-          offlineQueue.addParticipant(selected.id, uid)
-          startOfflineRetry(processOfflineQueue)
-          return // Don't throw, just queue it
-        }
-        
-        if (attempt === maxRetries) {
-          console.error(`[addParticipant] Failed after ${maxRetries} attempts:`, lastError)
-          throw lastError
-        }
+    try {
+      const r = await apiFetch(`${API_BASE}/conversations/${selected.id}/participants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: uid })
+      })
+
+      if (!r.ok) {
+        const detail = await r.text().catch(()=> '')
+        if (r.status === 401) throw new Error('No autorizado al registrar participante')
+        if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+        if (r.status === 409) return // Conflicto por carrera: ya existe
+        throw new Error(`Error ${r.status} añadiendo participante`)
       }
+
+      selectedParticipants.push(uid)
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Unknown error')
+      // Si el circuito está abierto o el servicio está caído, encolar y no bloquear al usuario
+      if (
+        err.message.includes('Circuit breaker') ||
+        err.message.includes('Service temporarily unavailable') ||
+        err.message.includes('502')
+      ) {
+        console.warn(`[addParticipant] Queuing participant ${uid} due to service unavailability`, err)
+        offlineQueue.addParticipant(selected.id, uid)
+        startOfflineRetry(processOfflineQueue)
+        return
+      }
+      console.error('[addParticipant] Failed to add participant', err)
+      throw err
     }
   }
   await add(userId)
@@ -227,98 +213,67 @@ export async function loadMessages(a: string, b?: string): Promise<DecryptedMess
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, mime: string = 'text/plain'): Promise<void> {
   const keyB64 = getStoredKey(conversationId)
-  const maxRetries = 3
-  let lastError: Error | null = null
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      if (!keyB64) {
-        // Sin clave local: delegar cifrado al backend con plaintext
-        const res = await apiFetch(`${API_BASE}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
-        })
-        if (!res.ok) {
-          const detail = await res.text().catch(()=> '')
-          if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
-          if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
-          
-          // Handle 502/503/504 with retry logic
-          if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
-            console.warn(`[sendMessage] Attempt ${attempt}/${maxRetries} failed with ${res.status}, retrying...`)
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-            continue
-          }
-          
-          throw new Error(`Error ${res.status} enviando mensaje`)
-        }
-        return // Success
-      } else {
-        // Con clave local: cifrar en cliente
-        const key = await importKeyBase64(keyB64)
-        const { ivB64, ctB64 } = await encryptText(key, text)
-        const res = await apiFetch(`${API_BASE}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
-        })
-        if (!res.ok) {
-          const detail = await res.text().catch(()=> '')
-          if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
-          if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
-          
-          // Handle 502/503/504 with retry logic
-          if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
-            console.warn(`[sendMessage] Attempt ${attempt}/${maxRetries} failed with ${res.status}, retrying...`)
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-            continue
-          }
-          
-          throw new Error(`Error ${res.status} enviando mensaje`)
-        }
-        return // Success
+
+  try {
+    if (!keyB64) {
+      // Sin clave local: delegar cifrado al backend con plaintext
+      const res = await apiFetch(`${API_BASE}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
+      })
+      if (!res.ok) {
+        const detail = await res.text().catch(()=> '')
+        if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
+        if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
+        throw new Error(`Error ${res.status} enviando mensaje`)
       }
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error')
-      
-      // If it's a circuit breaker error or server unavailable, queue the message
-      if (lastError.message.includes('Circuit breaker') || lastError.message.includes('Service temporarily unavailable')) {
-        console.warn('[sendMessage] Queuing message due to service unavailability')
-        offlineQueue.addMessage(conversationId, senderId, text, mime)
-        
-        // Start offline retry mechanism if not already running
-        startOfflineRetry(processOfflineQueue)
-        
-        // Show user-friendly message
-        throw new Error('Tu mensaje se guardó localmente y se enviará cuando el servidor esté disponible')
+      return
+    } else {
+      // Con clave local: cifrar en cliente
+      const key = await importKeyBase64(keyB64)
+      const { ivB64, ctB64 } = await encryptText(key, text)
+      const res = await apiFetch(`${API_BASE}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
+      })
+      if (!res.ok) {
+        const detail = await res.text().catch(()=> '')
+        if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
+        if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
+        throw new Error(`Error ${res.status} enviando mensaje`)
       }
-      
-      // Check if it's a persistent 502 error
-      if (lastError.message.includes('502') && attempt === maxRetries) {
-        console.warn('[sendMessage] Persistent 502 error, queuing message')
-        offlineQueue.addMessage(conversationId, senderId, text, mime)
-        startOfflineRetry(processOfflineQueue)
-        throw new Error('Tu mensaje se guardó localmente y se enviará cuando el servidor esté disponible')
-      }
-      
-      if (attempt === maxRetries) {
-        console.error(`[sendMessage] Failed after ${maxRetries} attempts:`, lastError)
-        throw lastError
-      }
-      console.warn(`[sendMessage] Attempt ${attempt}/${maxRetries} failed, retrying...`, lastError)
+      return
     }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error('Unknown error')
+
+    // Cuando apiFetch ya agotó sus reintentos y/o abrió el circuito, encolar el mensaje
+    if (
+      err.message.includes('Circuit breaker') ||
+      err.message.includes('Service temporarily unavailable') ||
+      err.message.includes('502')
+    ) {
+      console.warn('[sendMessage] Queuing message due to service unavailability', err)
+      offlineQueue.addMessage(conversationId, senderId, text, mime)
+      startOfflineRetry(processOfflineQueue)
+      // Mensaje amigable para el usuario
+      throw new Error('Tu mensaje se guardó localmente y se enviará cuando el servidor esté disponible')
+    }
+
+    console.error('[sendMessage] Failed to send message', err)
+    throw err
   }
-  throw lastError || new Error('Failed to send message')
 }
 
 // Process offline queue
 async function processOfflineQueue() {
   const pendingMessages = offlineQueue.getPendingMessages()
   const pendingParticipants = offlineQueue.getPendingParticipants()
-  
+
   console.log(`[OfflineQueue] Processing ${pendingMessages.length} messages and ${pendingParticipants.length} participants`)
-  
+
   // Try to process participants first
   for (const participant of pendingParticipants) {
     try {
@@ -327,7 +282,7 @@ async function processOfflineQueue() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: participant.userId })
       })
-      
+
       if (res.ok || res.status === 409) {
         offlineQueue.removeParticipant(participant.id)
         console.log(`[OfflineQueue] Successfully processed participant ${participant.userId}`)
@@ -339,13 +294,13 @@ async function processOfflineQueue() {
       offlineQueue.markParticipantAttempted(participant.id)
     }
   }
-  
+
   // Then process messages
   for (const message of pendingMessages) {
     try {
       const keyB64 = getStoredKey(message.conversationId)
       let body: any
-      
+
       if (!keyB64) {
         body = { conversation_id: message.conversationId, sender_id: message.senderId, plaintext: message.text, mime_type: message.mime }
       } else {
@@ -353,13 +308,13 @@ async function processOfflineQueue() {
         const { ivB64, ctB64 } = await encryptText(key, message.text)
         body = { conversation_id: message.conversationId, sender_id: message.senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: message.mime }
       }
-      
+
       const res = await apiFetch(`${API_BASE}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
-      
+
       if (res.ok) {
         offlineQueue.removeMessage(message.id)
         console.log(`[OfflineQueue] Successfully processed message ${message.id}`)
@@ -371,7 +326,7 @@ async function processOfflineQueue() {
       offlineQueue.markMessageAttempted(message.id)
     }
   }
-  
+
   // If queue is empty, stop the retry mechanism
   const stats = offlineQueue.getStats()
   if (stats.pendingMessages === 0 && stats.pendingParticipants === 0) {
@@ -385,15 +340,31 @@ export async function contactUser(currentUserId: string, otherUserId: string, in
   let conv: Conversation
   try {
     conv = await ensureConversationWith(currentUserId, otherUserId)
-  } catch {
-    conv = await ensureConversationQuick(currentUserId, otherUserId)
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error('Unknown error')
+    // Si es claramente CORS/502/backend caído, no intentes ensureConversationQuick, solo crea conv "virtual"
+    if (
+      err.message.includes('Circuit breaker') ||
+      err.message.includes('Service temporarily unavailable') ||
+      err.message.includes('Failed to fetch') ||
+      err.message.includes('502')
+    ) {
+      console.warn('[contactUser] Backend unavailable, creating virtual conversation only on client', err)
+      conv = {
+        id: `local-${currentUserId}-${otherUserId}`,
+        created_at: new Date().toISOString()
+      }
+    } else {
+      // Para otros errores mantén el fallback actual
+      conv = await ensureConversationQuick(currentUserId, otherUserId)
+    }
   }
   await sendMessage(conv.id, currentUserId, initialText)
   return conv
 }
 
+// Subscribe to messages and receipts (no-op for now)
 export function subscribeMessages(_conversationId?: string, _onNew?: () => void) { void _conversationId; void _onNew; return () => {} }
-
 export function subscribeReceipts(_conversationId?: string, _onReceipt?: () => void) { void _conversationId; void _onReceipt; return () => {} }
 
 export async function markDelivered(_userId?: string, _messageIds?: string[]) { void _userId; void _messageIds; }
@@ -421,74 +392,40 @@ export async function sendAttachment(_conversationId?: string, _userId?: string,
   throw new Error('Adjuntos no migrados aún')
 }
 async function ensureConversationQuick(userId: string, otherUserId: string): Promise<Conversation> {
-  let lastError: Error | null = null
-  const maxRetries = 3
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  // Simplificado: deja que apiFetch maneje reintentos/circuit breaker
+  const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
+  if (!res.ok) {
+    const detail = await res.text().catch(()=> '')
+    if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
+    if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
+    throw new Error(`Error ${res.status} creando conversación`)
+  }
+  const createdJson = await res.json()
+  const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
+
+  const add = async (uid: string) => {
     try {
-      const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
-      if (!res.ok) {
-        const detail = await res.text().catch(()=> '')
-        if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
-        if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
-        
-        // Handle 502/503/504 with retry logic
-        if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
-          console.warn(`[ensureConversationQuick] Attempt ${attempt}/${maxRetries} failed with ${res.status}, retrying...`)
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Linear backoff
-          continue
-        }
-        
-        throw new Error(`Error ${res.status} creando conversación`)
+      const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: uid })
+      })
+      if (!r.ok) {
+        const detail = await r.text().catch(()=> '')
+        if (r.status === 401) throw new Error('No autorizado al registrar participante')
+        if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+        if (r.status === 409) return
+        throw new Error(`Error ${r.status} añadiendo participante`)
       }
-      const createdJson = await res.json()
-      const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
-      
-      // Add participants with enhanced error handling
-      const add = async (uid: string) => {
-        const maxParticipantRetries = 3
-        for (let pAttempt = 1; pAttempt <= maxParticipantRetries; pAttempt++) {
-          try {
-            const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: uid })
-            })
-            if (!r.ok) {
-              const detail = await r.text().catch(()=> '')
-              if (r.status === 401) throw new Error('No autorizado al registrar participante')
-              if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
-              if (r.status === 409) return // Participant already exists
-              
-              // Handle 502/503/504 with retry logic
-              if ([502, 503, 504].includes(r.status) && pAttempt < maxParticipantRetries) {
-                console.warn(`[addParticipant] Attempt ${pAttempt}/${maxParticipantRetries} failed with ${r.status}, retrying...`)
-                await new Promise(resolve => setTimeout(resolve, 1000 * pAttempt))
-                continue
-              }
-              
-              throw new Error(`Error ${r.status} añadiendo participante`)
-            }
-            return // Success
-          } catch (error) {
-            if (pAttempt === maxParticipantRetries) throw error
-            console.warn(`[addParticipant] Attempt ${pAttempt}/${maxParticipantRetries} failed, retrying...`, error)
-          }
-        }
-      }
-      
-      await add(userId)
-      if (otherUserId !== userId) await add(otherUserId)
-      return conv
-      
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error')
-      if (attempt === maxRetries) {
-        console.error(`[ensureConversationQuick] Failed after ${maxRetries} attempts:`, lastError)
-        throw lastError
-      }
-      console.warn(`[ensureConversationQuick] Attempt ${attempt}/${maxRetries} failed, retrying...`, lastError)
+      const err = error instanceof Error ? error : new Error('Unknown error')
+      console.error('[ensureConversationQuick.add] Failed to add participant', err)
+      // en entorno de error de red, contactUser ya se encargará de fallback
+      throw err
     }
   }
-  throw lastError || new Error('Failed to create conversation')
+
+  await add(userId)
+  if (otherUserId !== userId) await add(otherUserId)
+  return conv
 }
