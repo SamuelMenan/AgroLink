@@ -144,7 +144,6 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   const maxRetries = 4
   let lastError: unknown = null
   let lastUrlTried = directUrl
-  let circuitBreakerTripped = false
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
