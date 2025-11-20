@@ -25,6 +25,30 @@ let circuitBreakerLastFailure = 0
 const CIRCUIT_BREAKER_THRESHOLD = 10 // Number of failures before opening
 const CIRCUIT_BREAKER_TIMEOUT = 30000 // 30 seconds before trying again
 
+// CORS-aware endpoint tracking
+const corsCompatibleEndpoints = new Set<string>()
+const corsIncompatibleEndpoints = new Set<string>()
+
+function isEndpointCorsCompatible(path: string): boolean {
+  // Check if we've already determined this endpoint's CORS compatibility
+  if (corsCompatibleEndpoints.has(path)) return true
+  if (corsIncompatibleEndpoints.has(path)) return false
+  
+  // Default to trying direct fetch for unknown endpoints
+  return true
+}
+
+function recordCorsCompatibility(path: string, compatible: boolean) {
+  const endpoint = path.split('/').slice(0, 4).join('/') // Get base endpoint path
+  if (compatible) {
+    corsCompatibleEndpoints.add(endpoint)
+    corsIncompatibleEndpoints.delete(endpoint)
+  } else {
+    corsIncompatibleEndpoints.add(endpoint)
+    corsCompatibleEndpoints.delete(endpoint)
+  }
+}
+
 // Enhanced exponential backoff with jitter to prevent thundering herd
 function calculateBackoff(attempt: number, baseMs: number = 500): number {
   const jitter = Math.random() * 200 // 0-200ms jitter
@@ -110,6 +134,10 @@ async function directFetch(path: string, init: RequestInit, headers: Headers, fe
   } catch (e) {
     console.error('[apiFetch] Direct fetch network error:', e)
     recordFailure()
+    // Check if it's a CORS error
+    if (e instanceof Error && e.message.includes('CORS')) {
+      console.error('[apiFetch] CORS policy blocking direct access - endpoint may not allow cross-origin requests')
+    }
     throw e
   }
 }
@@ -133,6 +161,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   const proxyUrl = proxiedPath
 
   // Enhanced logging for production debugging
+  const endpointPath = path.split('/').slice(0, 4).join('/')
   console.log('[apiFetch] Starting request:', {
     path,
     baseUrl: BASE_URL,
@@ -140,6 +169,10 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     directUrl,
     circuitBreakerState,
     circuitBreakerFailures,
+    endpoint: endpointPath,
+    corsCompatible: isEndpointCorsCompatible(endpointPath),
+    knownCompatibleEndpoints: Array.from(corsCompatibleEndpoints),
+    knownIncompatibleEndpoints: Array.from(corsIncompatibleEndpoints),
     timestamp: new Date().toISOString()
   })
 
@@ -157,37 +190,53 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary)
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, 12000)
       
-      // If proxy fails with 502/503/504, immediately try direct fetch
+      // If proxy fails with 502/503/504, immediately try direct fetch (if endpoint supports CORS)
       if (!res.ok && [502, 503, 504].includes(res.status)) {
-        console.warn(`[apiFetch] Proxy failed with ${res.status}, attempting direct fetch`, {
-          path,
-          status: res.status,
-          statusText: res.statusText,
-          attempt: attempt + 1,
-          timestamp: new Date().toISOString()
-        })
-        try {
-          const directRes = await directFetch(path, init, headers, fetchImpl)
-          // Treat 409 (Conflict) as success for idempotent operations
-          if (directRes.status === 409) {
-            console.log(`[apiFetch] Direct fetch successful (409 Conflict treated as success)`, {
+        const endpointPath = path.split('/').slice(0, 4).join('/')
+        
+        if (isEndpointCorsCompatible(endpointPath)) {
+          console.warn(`[apiFetch] Proxy failed with ${res.status}, attempting direct fetch`, {
+            path,
+            status: res.status,
+            statusText: res.statusText,
+            attempt: attempt + 1,
+            endpoint: endpointPath,
+            corsCompatible: true,
+            timestamp: new Date().toISOString()
+          })
+          try {
+            const directRes = await directFetch(path, init, headers, fetchImpl)
+            // Record that this endpoint works with direct access
+            recordCorsCompatibility(endpointPath, true)
+            
+            // Treat 409 (Conflict) as success for idempotent operations
+            if (directRes.status === 409) {
+              console.log(`[apiFetch] Direct fetch successful (409 Conflict treated as success)`, {
+                path,
+                status: directRes.status,
+                attempt: attempt + 1,
+                timestamp: new Date().toISOString()
+              })
+              return directRes
+            }
+            console.log(`[apiFetch] Direct fetch successful after proxy failure`, {
               path,
               status: directRes.status,
               attempt: attempt + 1,
               timestamp: new Date().toISOString()
             })
             return directRes
+          } catch (directError) {
+            console.error('[apiFetch] Direct fetch also failed:', directError)
+            // Record that this endpoint doesn't work with direct access
+            if (directError instanceof Error && directError.message.includes('CORS')) {
+              recordCorsCompatibility(endpointPath, false)
+              console.warn(`[apiFetch] Endpoint ${endpointPath} marked as CORS-incompatible`)
+            }
+            // Continue with normal retry logic
           }
-          console.log(`[apiFetch] Direct fetch successful after proxy failure`, {
-            path,
-            status: directRes.status,
-            attempt: attempt + 1,
-            timestamp: new Date().toISOString()
-          })
-          return directRes
-        } catch (directError) {
-          console.error('[apiFetch] Direct fetch also failed:', directError)
-          // Continue with normal retry logic
+        } else {
+          console.warn(`[apiFetch] Skipping direct fetch for CORS-incompatible endpoint: ${endpointPath}`)
         }
       }
       
@@ -226,23 +275,39 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       lastError = e
       recordFailure() // Record network failures
       
-      // On network error, try direct fetch immediately
+      // On network error, try direct fetch immediately (if endpoint supports CORS)
       if (attempt === 0) {
-        console.warn('[apiFetch] Network error on first attempt, trying direct fetch', {
-          path,
-          error: e,
-          timestamp: new Date().toISOString()
-        })
-        try {
-          const directRes = await directFetch(path, init, headers, fetchImpl)
-          console.log(`[apiFetch] Direct fetch successful after network error`, {
+        const endpointPath = path.split('/').slice(0, 4).join('/')
+        
+        if (isEndpointCorsCompatible(endpointPath)) {
+          console.warn('[apiFetch] Network error on first attempt, trying direct fetch', {
             path,
-            status: directRes.status,
+            error: e,
+            endpoint: endpointPath,
+            corsCompatible: true,
             timestamp: new Date().toISOString()
           })
-          return directRes
-        } catch (directError) {
-          console.error('[apiFetch] Direct fetch also failed:', directError)
+          try {
+            const directRes = await directFetch(path, init, headers, fetchImpl)
+            // Record that this endpoint works with direct access
+            recordCorsCompatibility(endpointPath, true)
+            
+            console.log(`[apiFetch] Direct fetch successful after network error`, {
+              path,
+              status: directRes.status,
+              timestamp: new Date().toISOString()
+            })
+            return directRes
+          } catch (directError) {
+            console.error('[apiFetch] Direct fetch also failed:', directError)
+            // Record that this endpoint doesn't work with direct access
+            if (directError instanceof Error && directError.message.includes('CORS')) {
+              recordCorsCompatibility(endpointPath, false)
+              console.warn(`[apiFetch] Endpoint ${endpointPath} marked as CORS-incompatible`)
+            }
+          }
+        } else {
+          console.warn(`[apiFetch] Skipping direct fetch for CORS-incompatible endpoint: ${endpointPath}`)
         }
       }
       
