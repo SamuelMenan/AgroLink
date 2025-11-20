@@ -30,6 +30,12 @@ async function warmupBackend() {
 export default async function handler(req, res) {
   const method = (req.method || 'GET').toUpperCase()
   
+  console.log('[products] Incoming request:', {
+    method,
+    url: req.url,
+    pathname: new URL(req.url, 'http://localhost').pathname
+  })
+  
   // Handle CORS preflight
   if (method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -43,11 +49,21 @@ export default async function handler(req, res) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const supabaseAnon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 
-  // Parse request path and query
+  // Parse request path and query - handle both /api/products/id and /id patterns
   const urlObj = new URL(req.url, 'http://localhost')
-  const pathMatch = urlObj.pathname.match(/\/api\/products\/?(.*)/)
-  const pathSuffix = pathMatch ? pathMatch[1] : ''
+  let pathSuffix = ''
+  
+  // Try multiple patterns to extract the product ID or path suffix
+  if (urlObj.pathname.includes('/api/products/')) {
+    pathSuffix = urlObj.pathname.split('/api/products/')[1] || ''
+  } else if (urlObj.pathname.startsWith('/') && urlObj.pathname.length > 1) {
+    // Direct pattern like /839b3c5c-09ba-4401-a3fe-d646941d22b9
+    pathSuffix = urlObj.pathname.substring(1)
+  }
+  
   const queryString = urlObj.search
+  
+  console.log('[products] Parsed:', { pathSuffix, queryString, method })
 
   // Warmup backend BEFORE attempting main request
   console.log('[products] Warming up backend before request...')
