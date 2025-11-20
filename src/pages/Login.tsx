@@ -15,6 +15,7 @@ export default function Login() {
   const [facebookLoading, setFacebookLoading] = useState(false)
   const [remember, setRemember] = useState(true)
   const [captchaOk, setCaptchaOk] = useState(false)
+  const [showPwd, setShowPwd] = useState(false)
 
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/simple'
@@ -84,12 +85,33 @@ export default function Login() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
-            />
+            <div className="relative">
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPwd ? 'text' : 'password'}
+                className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 pr-10 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+              />
+              <button
+                type="button"
+                aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                onClick={() => setShowPwd(v => !v)}
+                className="absolute inset-y-0 right-2 mt-1 flex items-center text-gray-500 hover:text-gray-700"
+              >
+                {showPwd ? (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.11 1 12c.74-1.58 1.78-3.03 3.07-4.26" />
+                    <path d="M10.58 10.58A3 3 0 0 0 12 15a3 3 0 0 0 2.42-4.42" />
+                    <path d="M1 1l22 22" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm text-gray-700">
