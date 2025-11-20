@@ -209,7 +209,9 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   throw lastError instanceof Error ? lastError : new Error('Auth request failed');
 }
 
-const AUTH_PREFIX = '/api/v1/auth'; // centralizado para evitar duplicaciones y errores al versionar
+// Prefijo de autenticación apuntando siempre al backend vía rewrite proxy.
+// Evita 405 (ruta inexistente en serverless) y problemas CORS.
+const AUTH_PREFIX = '/api/proxy/api/v1/auth';
 
 // Llamada directa a Supabase como último recurso para refrescar tokens.
 async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAuthResponse> {
@@ -290,7 +292,8 @@ export async function refreshSession() {
   try {
     await warmupProxy();
     await new Promise(r => setTimeout(r, 500));
-    const resp = await post(`/api/refresh`, { refresh_token: rt });
+    // Usar el prefijo proxied correcto del backend
+    const resp = await post(`${AUTH_PREFIX}/refresh`, { refresh_token: rt });
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     return resp;
   } catch (primaryErr) {
