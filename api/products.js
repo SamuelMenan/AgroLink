@@ -27,6 +27,13 @@ async function warmupBackend() {
   }
 }
 
+// Configure allowed methods for Vercel
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
+
 export default async function handler(req, res) {
   const method = (req.method || 'GET').toUpperCase()
   
@@ -287,11 +294,4 @@ export default async function handler(req, res) {
     console.error('[products] Handler error:', e)
     res.status(502).json({ ok: false, error: e.message || 'Request failed' })
   }
-}
-
-// Configure allowed methods for Vercel
-export const config = {
-  api: {
-    bodyParser: false,
-  },
 }

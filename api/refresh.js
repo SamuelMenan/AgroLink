@@ -27,15 +27,24 @@ async function warmupBackend() {
   }
 }
 
+// Configure allowed methods for Vercel
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
+
 export default async function handler(req, res) {
   const method = (req.method || 'POST').toUpperCase()
+  
+  // Set CORS headers for all requests
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', '*')
   
   console.log('[refresh] Incoming request:', { method })
   
   if (method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*')
     res.status(204).end()
     return
   }
