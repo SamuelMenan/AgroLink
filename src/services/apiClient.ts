@@ -94,7 +94,11 @@ async function directFetch(path: string, init: RequestInit, headers: Headers, fe
     console.warn('[apiFetch] Attempting direct fetch to backend:', directUrl)
     const res = await fetchWithTimeout(fetchImpl, directUrl, { ...init, headers }, 15000)
     
-    if (res.ok) {
+    // Treat 409 (Conflict) as success for idempotent operations like adding participants
+    if (res.status === 409) {
+      console.log('[apiFetch] Direct fetch successful (409 Conflict treated as success)')
+      recordSuccess()
+    } else if (res.ok) {
       console.log('[apiFetch] Direct fetch successful')
       recordSuccess()
     } else {
@@ -164,6 +168,16 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         })
         try {
           const directRes = await directFetch(path, init, headers, fetchImpl)
+          // Treat 409 (Conflict) as success for idempotent operations
+          if (directRes.status === 409) {
+            console.log(`[apiFetch] Direct fetch successful (409 Conflict treated as success)`, {
+              path,
+              status: directRes.status,
+              attempt: attempt + 1,
+              timestamp: new Date().toISOString()
+            })
+            return directRes
+          }
           console.log(`[apiFetch] Direct fetch successful after proxy failure`, {
             path,
             status: directRes.status,
