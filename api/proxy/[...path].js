@@ -63,14 +63,24 @@ export default async function handler(req, res) {
     try {
       resp = await makeRequest()
       if ([502,503,504].includes(resp.status) && attempt < max - 1) {
-        await sleep(600 * (attempt + 1))
+        // Enhanced backoff with jitter to prevent thundering herd
+        const jitter = Math.random() * 200
+        const backoff = Math.min(600 * (attempt + 1) + jitter, 3000)
+        console.warn(`[proxy] Attempt ${attempt + 1}/${max} failed with ${resp.status}, retrying after ${Math.round(backoff)}ms`)
+        await sleep(backoff)
         continue
       }
       break
     } catch (e) {
       lastErr = e
-      if (attempt < max - 1) { await sleep(300 * (attempt + 1)); continue }
-      console.error('[proxy] fetch error', e && e.message)
+      if (attempt < max - 1) { 
+        const jitter = Math.random() * 100
+        const backoff = 300 * (attempt + 1) + jitter
+        console.warn(`[proxy] Network attempt ${attempt + 1}/${max} failed, retrying after ${Math.round(backoff)}ms:`, e && e.message)
+        await sleep(backoff)
+        continue 
+      }
+      console.error('[proxy] fetch error after retries', e && e.message)
       res.status(502).json({ ok: false, error: (e && e.message) || 'proxy fetch failed' })
       return
     }

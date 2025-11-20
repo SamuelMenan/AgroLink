@@ -23,7 +23,11 @@ export default function Products() {
   useEffect(()=>{
     ;(async ()=>{
       try {
-        await fetch('/api/proxy/actuator/health', { cache: 'no-store' })
+        // Enhanced pre-warming with multiple endpoints
+        await Promise.all([
+          fetch('/api/proxy/actuator/health', { cache: 'no-store' }).catch(() => {}),
+          fetch('/api/warm', { cache: 'no-store' }).catch(() => {})
+        ])
       } catch {}
     })()
   }, [])
@@ -169,19 +173,65 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       return
     }
     setSendingMsg(true)
-    try {
-      try { await fetch('/api/proxy/actuator/health', { cache: 'no-store' }) } catch {}
-      // Crear/asegurar conversación con el vendedor y enviar mensaje inicial
-      await contactUser(user.id, p.user_id, text)
-      setMsgSent(true)
-    } catch (e) {
-      let m = e instanceof Error ? e.message : 'No fue posible enviar el mensaje'
-      const is5xx = /\b5\d{2}\b/.test(m) || /Error\s+5\d\d/.test(m)
-      if (is5xx) m = 'Estamos iniciando el servidor, intenta de nuevo en unos segundos'
-      setErr(m)
-    } finally {
-      setSendingMsg(false)
+    
+    // Enhanced pre-warming and retry logic
+    const maxRetries = 2
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Enhanced pre-warming with multiple endpoints
+        try {
+          await Promise.all([
+            fetch('/api/proxy/actuator/health', { cache: 'no-store' }).catch(() => {}),
+            fetch('/api/warm', { cache: 'no-store' }).catch(() => {})
+          ])
+        } catch {}
+        
+        // Wait a bit after pre-warming for cold start mitigation
+        if (attempt > 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+        
+        // Crear/asegurar conversación con el vendedor y enviar mensaje inicial
+        await contactUser(user.id, p.user_id, text)
+        setMsgSent(true)
+        return // Success
+        
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error('Unknown error')
+        const m = lastError.message
+        const is5xx = /\b5\d{2}\b/.test(m) || /Error\s+5\d\d/.test(m) || m.includes('502') || m.includes('503') || m.includes('504')
+        
+        if (is5xx && attempt < maxRetries) {
+          console.warn(`[sendMarketplaceMessage] Attempt ${attempt}/${maxRetries} failed with server error, retrying...`)
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt)) // Exponential backoff
+          continue
+        }
+        
+        // Final error handling
+        let errorMsg = m
+        if (is5xx) {
+          errorMsg = 'El servidor está iniciando, por favor intenta de nuevo en unos segundos'
+        } else if (m.includes('401')) {
+          errorMsg = 'Por favor inicia sesión para enviar mensajes'
+        } else if (m.includes('403')) {
+          errorMsg = 'No tienes permiso para enviar mensajes a este usuario'
+        }
+        
+        setErr(errorMsg)
+        break // Don't retry non-5xx errors
+      }
     }
+    
+    if (lastError && !msgSent) {
+      console.error('[sendMarketplaceMessage] Failed after retries:', lastError)
+      if (!err) {
+        setErr('No fue posible enviar el mensaje. Por favor intenta de nuevo.')
+      }
+    }
+    
+    setSendingMsg(false)
   }
   function onAddToCart(){
     addToCart({ id: p.id, name: p.name, price: p.price, image_url: p.image_urls?.[0], seller_id: p.user_id }, 1)

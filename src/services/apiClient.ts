@@ -18,6 +18,13 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// Enhanced exponential backoff with jitter to prevent thundering herd
+function calculateBackoff(attempt: number, baseMs: number = 500): number {
+  const jitter = Math.random() * 200 // 0-200ms jitter
+  const exponential = Math.pow(2, attempt) * baseMs
+  return Math.min(exponential + jitter, 5000) // Cap at 5 seconds
+}
+
 function fetchWithTimeout(fetchImpl: FetchLike, input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController()
   const id = setTimeout(() => controller.abort(), timeoutMs)
@@ -82,16 +89,22 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, status: res.status, attempt }) }) } catch {}
       }
       if (!res.ok && [502, 503, 504].includes(res.status) && attempt < maxRetries - 1) {
+        // Enhanced retry with exponential backoff and pre-warming
+        const backoffMs = calculateBackoff(attempt, 600)
+        console.warn(`[apiFetch] Retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path} (status: ${res.status})`)
         await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
-        await sleep(500 * (attempt + 1))
+        await sleep(backoffMs)
         continue
       }
       return res
     } catch (e) {
       lastError = e
       if (attempt < maxRetries - 1) {
+        // Enhanced retry for network/timeout errors
+        const backoffMs = calculateBackoff(attempt, 700)
+        console.warn(`[apiFetch] Network retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path}`, e)
         await warmupBackend(fetchImpl, '/api/proxy', BASE_URL)
-        await sleep(600 * (attempt + 1))
+        await sleep(backoffMs)
         continue
       }
     }

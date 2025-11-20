@@ -56,19 +56,43 @@ export async function ensureConversationWith(userId: string, otherUserId: string
   // Añadir participantes necesarios sin provocar conflicto 409
   const add = async (uid: string) => {
     if (selectedParticipants.includes(uid)) return
-    const r = await apiFetch(`${API_BASE}/conversations/${selected.id}/participants`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: uid })
-    })
-    if (!r.ok) {
-      const detail = await r.text().catch(()=> '')
-      if (r.status === 401) throw new Error('No autorizado al registrar participante')
-      if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
-      if (r.status === 409) return // Conflicto por carrera: ya existe
-      throw new Error(`Error ${r.status} añadiendo participante`)
+    let lastError: Error | null = null
+    const maxRetries = 3
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const r = await apiFetch(`${API_BASE}/conversations/${selected.id}/participants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: uid })
+        })
+        
+        if (!r.ok) {
+          const detail = await r.text().catch(()=> '')
+          if (r.status === 401) throw new Error('No autorizado al registrar participante')
+          if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+          if (r.status === 409) return // Conflicto por carrera: ya existe
+          
+          // Handle 502/503/504 with retry logic
+          if ([502, 503, 504].includes(r.status) && attempt < maxRetries) {
+            console.warn(`[addParticipant] Attempt ${attempt}/${maxRetries} failed with ${r.status}, retrying...`)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Linear backoff
+            continue
+          }
+          
+          throw new Error(`Error ${r.status} añadiendo participante`)
+        }
+        
+        selectedParticipants.push(uid)
+        return // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error')
+        if (attempt === maxRetries) {
+          console.error(`[addParticipant] Failed after ${maxRetries} attempts:`, lastError)
+          throw lastError
+        }
+      }
     }
-    selectedParticipants.push(uid)
   }
   await add(userId)
   if (otherUserId !== userId) await add(otherUserId)
@@ -193,36 +217,68 @@ export async function loadMessages(a: string, b?: string): Promise<DecryptedMess
 
 export async function sendMessage(conversationId: string, senderId: string, text: string, mime: string = 'text/plain'): Promise<void> {
   const keyB64 = getStoredKey(conversationId)
-  if (!keyB64) {
-    // Sin clave local: delegar cifrado al backend con plaintext
-    const res = await apiFetch(`${API_BASE}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
-    })
-    if (!res.ok) {
-      const detail = await res.text().catch(()=> '')
-      if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
-      if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
-      throw new Error(`Error ${res.status} enviando mensaje`)
-    }
-    return
-  } else {
-    // Con clave local: cifrar en cliente
-    const key = await importKeyBase64(keyB64)
-    const { ivB64, ctB64 } = await encryptText(key, text)
-    const res = await apiFetch(`${API_BASE}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
-    })
-    if (!res.ok) {
-      const detail = await res.text().catch(()=> '')
-      if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
-      if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
-      throw new Error(`Error ${res.status} enviando mensaje`)
+  const maxRetries = 3
+  let lastError: Error | null = null
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (!keyB64) {
+        // Sin clave local: delegar cifrado al backend con plaintext
+        const res = await apiFetch(`${API_BASE}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, plaintext: text, mime_type: mime })
+        })
+        if (!res.ok) {
+          const detail = await res.text().catch(()=> '')
+          if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
+          if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
+          
+          // Handle 502/503/504 with retry logic
+          if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
+            console.warn(`[sendMessage] Attempt ${attempt}/${maxRetries} failed with ${res.status}, retrying...`)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+            continue
+          }
+          
+          throw new Error(`Error ${res.status} enviando mensaje`)
+        }
+        return // Success
+      } else {
+        // Con clave local: cifrar en cliente
+        const key = await importKeyBase64(keyB64)
+        const { ivB64, ctB64 } = await encryptText(key, text)
+        const res = await apiFetch(`${API_BASE}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: conversationId, sender_id: senderId, content_ciphertext: ctB64, iv: ivB64, mime_type: mime })
+        })
+        if (!res.ok) {
+          const detail = await res.text().catch(()=> '')
+          if (res.status === 401) throw new Error('No autorizado: inicia sesión para enviar mensajes')
+          if (res.status === 403) throw new Error(detail || 'No tienes permiso para enviar este mensaje')
+          
+          // Handle 502/503/504 with retry logic
+          if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
+            console.warn(`[sendMessage] Attempt ${attempt}/${maxRetries} failed with ${res.status}, retrying...`)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+            continue
+          }
+          
+          throw new Error(`Error ${res.status} enviando mensaje`)
+        }
+        return // Success
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error')
+      if (attempt === maxRetries) {
+        console.error(`[sendMessage] Failed after ${maxRetries} attempts:`, lastError)
+        throw lastError
+      }
+      console.warn(`[sendMessage] Attempt ${attempt}/${maxRetries} failed, retrying...`, lastError)
     }
   }
+  throw lastError || new Error('Failed to send message')
 }
 
 // Helper para iniciar contacto desde productos u otros contextos
@@ -266,30 +322,74 @@ export async function sendAttachment(_conversationId?: string, _userId?: string,
   throw new Error('Adjuntos no migrados aún')
 }
 async function ensureConversationQuick(userId: string, otherUserId: string): Promise<Conversation> {
-  const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
-  if (!res.ok) {
-    const detail = await res.text().catch(()=> '')
-    if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
-    if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
-    throw new Error(`Error ${res.status} creando conversación`)
-  }
-  const createdJson = await res.json()
-  const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
-  const add = async (uid: string) => {
-    const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: uid })
-    })
-    if (!r.ok) {
-      const detail = await r.text().catch(()=> '')
-      if (r.status === 401) throw new Error('No autorizado al registrar participante')
-      if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
-      if (r.status === 409) return
-      throw new Error(`Error ${r.status} añadiendo participante`)
+  let lastError: Error | null = null
+  const maxRetries = 3
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await apiFetch(`${API_BASE}/conversations`, { method: 'POST' })
+      if (!res.ok) {
+        const detail = await res.text().catch(()=> '')
+        if (res.status === 401) throw new Error('No autorizado: inicia sesión para crear conversaciones')
+        if (res.status === 403) throw new Error(detail || 'Permisos insuficientes para crear conversaciones')
+        
+        // Handle 502/503/504 with retry logic
+        if ([502, 503, 504].includes(res.status) && attempt < maxRetries) {
+          console.warn(`[ensureConversationQuick] Attempt ${attempt}/${maxRetries} failed with ${res.status}, retrying...`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Linear backoff
+          continue
+        }
+        
+        throw new Error(`Error ${res.status} creando conversación`)
+      }
+      const createdJson = await res.json()
+      const conv: Conversation = Array.isArray(createdJson) ? createdJson[0] : createdJson
+      
+      // Add participants with enhanced error handling
+      const add = async (uid: string) => {
+        const maxParticipantRetries = 3
+        for (let pAttempt = 1; pAttempt <= maxParticipantRetries; pAttempt++) {
+          try {
+            const r = await apiFetch(`${API_BASE}/conversations/${conv.id}/participants`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: uid })
+            })
+            if (!r.ok) {
+              const detail = await r.text().catch(()=> '')
+              if (r.status === 401) throw new Error('No autorizado al registrar participante')
+              if (r.status === 403) throw new Error(detail || 'No puedes añadir este participante')
+              if (r.status === 409) return // Participant already exists
+              
+              // Handle 502/503/504 with retry logic
+              if ([502, 503, 504].includes(r.status) && pAttempt < maxParticipantRetries) {
+                console.warn(`[addParticipant] Attempt ${pAttempt}/${maxParticipantRetries} failed with ${r.status}, retrying...`)
+                await new Promise(resolve => setTimeout(resolve, 1000 * pAttempt))
+                continue
+              }
+              
+              throw new Error(`Error ${r.status} añadiendo participante`)
+            }
+            return // Success
+          } catch (error) {
+            if (pAttempt === maxParticipantRetries) throw error
+            console.warn(`[addParticipant] Attempt ${pAttempt}/${maxParticipantRetries} failed, retrying...`, error)
+          }
+        }
+      }
+      
+      await add(userId)
+      if (otherUserId !== userId) await add(otherUserId)
+      return conv
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error')
+      if (attempt === maxRetries) {
+        console.error(`[ensureConversationQuick] Failed after ${maxRetries} attempts:`, lastError)
+        throw lastError
+      }
+      console.warn(`[ensureConversationQuick] Attempt ${attempt}/${maxRetries} failed, retrying...`, lastError)
     }
   }
-  await add(userId)
-  if (otherUserId !== userId) await add(otherUserId)
-  return conv
+  throw lastError || new Error('Failed to create conversation')
 }

@@ -1,10 +1,14 @@
-const BASE = process.env.TEST_BASE_URL || ''
+const normalize = (u) => (typeof u === 'string' ? u.replace(/\/+$/, '') : '')
+const BASE = normalize(process.env.TEST_BASE_URL) || normalize(process.env.VERCEL_URL) || normalize(process.env.DEPLOYMENT_URL) || ''
 const TOKEN = process.env.TEST_ACCESS_TOKEN || ''
 
 const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }
 
 async function hit(method, path, body) {
-  const url = `${BASE}${path}`
+  if (!BASE) {
+    throw new Error('TEST_BASE_URL no está definido. Establécelo p. ej. https://agro-link-jet.vercel.app')
+  }
+  const url = path.startsWith('http') ? path : `${BASE}${path.startsWith('/') ? path : `/${path}`}`
   const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined })
   const text = await res.text()
   return { url, status: res.status, ok: res.ok, sample: text.slice(0, 120) }
