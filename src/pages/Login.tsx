@@ -27,6 +27,11 @@ export default function Login() {
     return `${origin}${path}`
   }, [nextParam])
 
+  const onIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.replace(/^\s+/, '')
+    setIdentifier(v)
+  }
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
@@ -71,7 +76,7 @@ export default function Login() {
             <label className="block text-sm font-medium text-gray-700">Correo electrónico o teléfono</label>
             <input
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              onChange={onIdentifierChange}
               type="text"
               className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
               placeholder="tu@email.com o 3001234567"
