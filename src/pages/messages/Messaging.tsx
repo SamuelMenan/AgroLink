@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useMessaging } from '../context/MessagingContext';
-import { Conversation, Message } from '../types/messaging';
-import { Send, Search, MoreVertical, Archive, Trash2, UserPlus, ChevronLeft } from 'lucide-react';
+import { useMessaging } from '../../context/MessagingContext';
+import type { Conversation } from '../../types/messaging';
+import { Send, Search, Archive, UserPlus, ChevronLeft, MoreVertical } from 'lucide-react';
 
 export default function Messaging() {
   const { 
@@ -30,7 +30,7 @@ export default function Messaging() {
       loadMessages(state.activeConversation.id);
       // Mark messages as read
       const unreadMessages = state.messages[state.activeConversation.id]?.filter(
-        msg => !msg.readAt && msg.senderId !== 'current-user'
+        msg => !msg.readAt && msg.senderId !== state.currentUserId
       ) || [];
       
       if (unreadMessages.length > 0) {
@@ -40,7 +40,7 @@ export default function Messaging() {
         );
       }
     }
-  }, [state.activeConversation, loadMessages, markAsRead]);
+  }, [state.activeConversation, loadMessages, markAsRead, state.currentUserId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -246,19 +246,19 @@ export default function Messaging() {
                 <div
                   key={message.id}
                   className={`flex ${
-                    message.senderId === 'current-user' ? 'justify-end' : 'justify-start'
+                    message.senderId === state.currentUserId ? 'justify-end' : 'justify-start'
                   }`}
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.senderId === 'current-user'
+                      message.senderId === state.currentUserId
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-200 text-gray-900'
                     }`}
                   >
                     <p className="text-sm">{message.content}</p>
                     <p className={`text-xs mt-1 ${
-                      message.senderId === 'current-user' ? 'text-green-100' : 'text-gray-500'
+                      message.senderId === state.currentUserId ? 'text-green-100' : 'text-gray-500'
                     }`}>
                       {formatTime(message.createdAt)}
                     </p>

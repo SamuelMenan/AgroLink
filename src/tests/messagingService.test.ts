@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MessagingService } from '../../src/services/messagingService';
 import { apiClient } from '../../src/services/apiClient';
-import { Message, Conversation, SendMessageRequest } from '../../src/types/messaging';
+import type { Message, Conversation, SendMessageRequest } from '../../src/types/messaging';
 
 // Create a fresh instance for testing
 let messagingService: MessagingService;
@@ -80,7 +80,10 @@ describe('MessagingService', () => {
         conversations: [
           {
             id: 'conv-123',
-            participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+            participants: [
+              { userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true },
+              { userId: 'user-2', joinedAt: new Date().toISOString(), notificationsEnabled: true }
+            ],
             unreadCount: 0,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -145,7 +148,10 @@ describe('MessagingService', () => {
     it('should create a new conversation', async () => {
       const mockConversation: Conversation = {
         id: 'conv-123',
-        participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+        participants: [
+          { userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true },
+          { userId: 'user-2', joinedAt: new Date().toISOString(), notificationsEnabled: true }
+        ],
         unreadCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -253,7 +259,7 @@ describe('MessagingService', () => {
       };
       
       // Store original EventSource
-      originalEventSource = global.EventSource;
+      originalEventSource = (window as any).EventSource;
       
       // Create a spyable constructor
       mockEventSourceConstructor = vi.fn(function(this: any, url: string) {
@@ -263,12 +269,12 @@ describe('MessagingService', () => {
         this.onerror = null;
       });
       
-      global.EventSource = mockEventSourceConstructor as any;
+      (window as any).EventSource = mockEventSourceConstructor as any;
     });
 
     afterEach(() => {
       // Restore original EventSource
-      global.EventSource = originalEventSource;
+      (window as any).EventSource = originalEventSource;
     });
 
     it('should connect to real-time events', () => {

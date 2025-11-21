@@ -2,7 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useMessaging, MessagingProvider } from '../../src/context/MessagingContext';
 import { messagingService } from '../../src/services/messagingService';
-import { Conversation, Message } from '../../src/types/messaging';
+import type { Conversation, Message } from '../../src/types/messaging';
 
 // Mock messaging service
 vi.mock('../../src/services/messagingService', () => ({
@@ -48,7 +48,10 @@ describe('MessagingContext', () => {
       const mockConversations: Conversation[] = [
         {
           id: 'conv-1',
-          participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+          participants: [
+            { userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true },
+            { userId: 'user-2', joinedAt: new Date().toISOString(), notificationsEnabled: true }
+          ],
           unreadCount: 0,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -179,7 +182,10 @@ describe('MessagingContext', () => {
     it('should create a new conversation', async () => {
       const mockConversation: Conversation = {
         id: 'conv-new',
-        participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+        participants: [
+          { userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true },
+          { userId: 'user-2', joinedAt: new Date().toISOString(), notificationsEnabled: true }
+        ],
         unreadCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -276,7 +282,7 @@ describe('MessagingContext', () => {
     it('should set active conversation', () => {
       const mockConversation: Conversation = {
         id: 'conv-1',
-        participants: [{ userId: 'user-1' }],
+        participants: [{ userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true }],
         unreadCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -343,7 +349,7 @@ describe('MessagingContext', () => {
     it('should throw error when used outside MessagingProvider', () => {
       const { result } = renderHook(() => useMessaging());
 
-      expect(result.error).toEqual(
+      expect(() => result.current).toThrow(
         new Error('useMessaging must be used within a MessagingProvider')
       );
     });

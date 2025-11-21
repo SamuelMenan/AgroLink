@@ -9,7 +9,6 @@ interface MessageThreadProps {
   onSendMessage: (content: string) => Promise<void>;
   onDeleteMessage: (messageId: string) => Promise<void>;
   onEditMessage: (messageId: string, newContent: string) => Promise<void>;
-  onReplyMessage: (messageId: string) => void;
   loading?: boolean;
   error?: string;
 }
@@ -21,7 +20,6 @@ export default function MessageThread({
   onSendMessage,
   onDeleteMessage,
   onEditMessage,
-  onReplyMessage,
   loading,
   error
 }: MessageThreadProps) {
@@ -154,20 +152,6 @@ export default function MessageThread({
                     message.status === 'failed' ? 'border-2 border-red-300' : ''
                   }`}
                 >
-                  {/* Reply indicator */}
-                  {message.attachments?.some(att => att.type === 'reply') && (
-                    <div className={`text-xs mb-2 p-2 rounded border-l-2 ${
-                      message.senderId === currentUserId
-                        ? 'bg-green-500 border-green-300 text-green-100'
-                        : 'bg-gray-50 border-gray-300 text-gray-600'
-                    }`}>
-                      <p className="font-medium">En respuesta a:</p>
-                      <p className="truncate">
-                        {message.attachments?.find(att => att.type === 'reply')?.metadata?.originalContent}
-                      </p>
-                    </div>
-                  )}
-
                   {/* Message content */}
                   {editingMessage === message.id ? (
                     <div className="space-y-2">
@@ -202,7 +186,7 @@ export default function MessageThread({
 
                   {/* Message actions (only for current user's messages) */}
                   {message.senderId === currentUserId && editingMessage !== message.id && (
-                    <div className={`absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity ${
+                    <div className={`absolute top-1 right-1 opacity-0 hover:opacity-100 transition-opacity ${
                       message.senderId === currentUserId ? 'right-1' : 'left-1'
                     }`}>
                       <div className="flex space-x-1">

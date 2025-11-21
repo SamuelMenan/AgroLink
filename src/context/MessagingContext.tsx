@@ -51,6 +51,7 @@ const initialState: MessagingState = {
   connected: false,
   unreadCounts: {},
   searchFilters: {},
+  currentUserId: 'current-user', // This should be set from auth context in real app
 };
 
 export function messagingReducer(state: MessagingState, action: MessagingAction): MessagingState {
@@ -362,3 +363,5 @@ export function useMessaging() {
   }
   return context;
 }
+
+export type { MessagingState, MessagingAction };

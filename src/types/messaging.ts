@@ -90,6 +90,7 @@ export interface MessagingState {
   unreadCounts: Record<string, number>;
   searchResults?: Message[];
   searchFilters: MessageSearchFilters;
+  currentUserId: string;
 }
 
 export interface MessagingEvent {

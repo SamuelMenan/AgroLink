@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Conversation, ConversationParticipant } from '../../types/messaging';
+import type { Conversation } from '../../types/messaging';
 import { Search, UserPlus, Archive, MoreVertical, Circle } from 'lucide-react';
 
 interface ConversationListProps {
@@ -190,7 +190,7 @@ export default function ConversationList({
                         </span>
                         <button
                           onClick={(e) => handleArchiveClick(e, conversation.id)}
-                          className="p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100"
+                          className="p-1 text-gray-400 hover:text-gray-600"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </button>
@@ -203,10 +203,10 @@ export default function ConversationList({
 
                     {/* Status indicators */}
                     <div className="flex items-center space-x-2 mt-2">
-                      {conversation.participants.some(p => p.userId !== 'current-user' && p.lastReadAt) && (
+                      {conversation.participants.some(p => p.userId !== currentUserId && p.lastReadAt) && (
                         <Circle className="h-2 w-2 text-green-500 fill-current" />
                       )}
-                      {conversation.archivedBy?.includes('current-user') && (
+                      {conversation.archivedBy?.includes(currentUserId) && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs text-gray-500 bg-gray-100">
                           Archivado
                         </span>

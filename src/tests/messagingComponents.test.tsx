@@ -1,9 +1,9 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import ConversationList from '../../src/components/messaging/ConversationList';
 import MessageThread from '../../src/components/messaging/MessageThread';
-import { Conversation, Message } from '../../src/types/messaging';
+import type { Conversation, Message } from '../../src/types/messaging';
 
 // Mock Lucide React icons
 vi.mock('lucide-react', () => ({
@@ -24,7 +24,10 @@ describe('ConversationList Component', () => {
   const mockConversations: Conversation[] = [
     {
       id: 'conv-1',
-      participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+      participants: [
+        { userId: 'user-1', joinedAt: '2023-01-01T00:00:00Z', notificationsEnabled: true },
+        { userId: 'user-2', joinedAt: '2023-01-01T00:00:00Z', notificationsEnabled: true }
+      ],
       unreadCount: 2,
       createdAt: '2023-01-01T00:00:00Z',
       updatedAt: '2023-01-02T00:00:00Z',
@@ -40,7 +43,11 @@ describe('ConversationList Component', () => {
     },
     {
       id: 'conv-2',
-      participants: [{ userId: 'user-1' }, { userId: 'user-3' }, { userId: 'user-4' }],
+      participants: [
+        { userId: 'user-1', joinedAt: '2023-01-03T00:00:00Z', notificationsEnabled: true },
+        { userId: 'user-3', joinedAt: '2023-01-03T00:00:00Z', notificationsEnabled: true },
+        { userId: 'user-4', joinedAt: '2023-01-03T00:00:00Z', notificationsEnabled: true }
+      ],
       unreadCount: 0,
       createdAt: '2023-01-03T00:00:00Z',
       updatedAt: '2023-01-04T00:00:00Z',

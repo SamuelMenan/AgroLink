@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { messagingReducer, MessagingState, MessagingAction } from '../../src/context/MessagingContext';
-import { Conversation, Message } from '../../src/types/messaging';
+import { messagingReducer } from '../../src/context/MessagingContext';
+import type { MessagingState, MessagingAction } from '../../src/context/MessagingContext';
+import type { Conversation, Message } from '../../src/types/messaging';
 
 describe('MessagingContext Reducer', () => {
   const initialState: MessagingState = {
@@ -11,6 +12,7 @@ describe('MessagingContext Reducer', () => {
     connected: false,
     unreadCounts: {},
     searchFilters: {},
+    currentUserId: 'test-user',
   };
 
   describe('SET_LOADING', () => {
@@ -46,7 +48,10 @@ describe('MessagingContext Reducer', () => {
       const mockConversations: Conversation[] = [
         {
           id: 'conv-1',
-          participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+          participants: [
+            { userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true },
+            { userId: 'user-2', joinedAt: new Date().toISOString(), notificationsEnabled: true }
+          ],
           unreadCount: 0,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -65,7 +70,10 @@ describe('MessagingContext Reducer', () => {
     it('should add a new conversation', () => {
       const mockConversation: Conversation = {
         id: 'conv-1',
-        participants: [{ userId: 'user-1' }, { userId: 'user-2' }],
+        participants: [
+          { userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true },
+          { userId: 'user-2', joinedAt: new Date().toISOString(), notificationsEnabled: true }
+        ],
         unreadCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -121,7 +129,7 @@ describe('MessagingContext Reducer', () => {
     it('should set active conversation', () => {
       const mockConversation: Conversation = {
         id: 'conv-1',
-        participants: [{ userId: 'user-1' }],
+        participants: [{ userId: 'user-1', joinedAt: new Date().toISOString(), notificationsEnabled: true }],
         unreadCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -202,7 +210,7 @@ describe('MessagingContext Reducer', () => {
       const updatedMessage: Message = {
         ...originalMessage,
         content: 'Updated content',
-        status: 'edited'
+        status: 'sent'
       };
       
       const action: MessagingAction = { type: 'UPDATE_MESSAGE', payload: { conversationId: 'conv-1', message: updatedMessage } };
@@ -224,7 +232,7 @@ describe('MessagingContext Reducer', () => {
               senderId: 'user-1',
               content: 'Message to delete',
               createdAt: new Date().toISOString(),
-              status: 'sent'
+              status: 'sent' as const
             }
           ]
         }
