@@ -50,7 +50,7 @@ export default function AccountPrivacy(){
       setError(null)
       try {
         const patch = {
-          full_name: debouncedProfile.full_name ?? '',
+          full_name: (debouncedProfile.full_name ?? '').replace(/^\s+/, ''),
           email: debouncedProfile.email ?? '',
           phone: debouncedProfile.phone ?? '',
           address: debouncedProfile.address ?? '',
@@ -117,7 +117,7 @@ export default function AccountPrivacy(){
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-sm text-gray-600">Nombre</label>
-            <input value={profile?.full_name ?? ''} onChange={(e)=> onChange('full_name', e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+            <input value={profile?.full_name ?? ''} onChange={(e)=> onChange('full_name', e.target.value.replace(/^\s+/, ''))} className="mt-1 w-full rounded border px-3 py-2" />
             <VisibilitySelect label="Visibilidad del nombre" value={profile?.name_visibility ?? 'contacts'} onChange={(v)=> onChange('name_visibility', v)} />
           </div>
           <div>
