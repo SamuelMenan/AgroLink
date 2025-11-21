@@ -538,12 +538,14 @@ export default async function handler(req, res) {
                 
                 // If not found in profiles, try the get_user_info function
                 if (!senderName) {
-                  const userInfoResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_info?user_id=eq.${message.sender_id}`, {
+                  const userInfoResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_info`, {
+                    method: 'POST',
                     headers: { 
                       'apikey': SUPABASE_ANON_KEY, 
                       'Authorization': `Bearer ${userToken}`, 
                       'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ user_id: message.sender_id })
                   })
                   
                   if (userInfoResp.ok) {

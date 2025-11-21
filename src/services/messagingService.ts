@@ -556,7 +556,6 @@ export async function sendMessage(
     body: JSON.stringify({
       conversation_id: conversationId,
       sender_id: senderId,
-      sender_name: senderName,
       content,
       type: 'message',
       is_from_buyer: isFromBuyer
@@ -581,7 +580,6 @@ export async function sendMessage(
           body: JSON.stringify({
             conversation_id: conversationId,
             sender_id: senderId,
-            sender_name: senderName,
             content,
             type: 'message',
             is_from_buyer: isFromBuyer
@@ -634,7 +632,7 @@ export async function sendMessage(
 export async function sendQuickRequest(
   conversationId: string,
   buyerId: string,
-  buyerName: string,
+  _buyerName: string,
   requestType: QuickRequestType,
   customMessage?: string
 ): Promise<Message> {
@@ -654,7 +652,6 @@ export async function sendQuickRequest(
     body: JSON.stringify({
       conversation_id: conversationId,
       sender_id: buyerId,
-      sender_name: buyerName,
       content,
       type: 'quick_request',
       quick_request_type: requestType,
@@ -673,7 +670,7 @@ export async function sendQuickRequest(
 export async function sendQuickResponse(
   conversationId: string,
   sellerId: string,
-  sellerName: string,
+  _sellerName: string,
   responseType: QuickResponseType,
   originalMessageId?: string
 ): Promise<Message> {
@@ -691,7 +688,6 @@ export async function sendQuickResponse(
     body: JSON.stringify({
       conversation_id: conversationId,
       sender_id: sellerId,
-      sender_name: sellerName,
       content: response.message,
       type: 'quick_response',
       quick_response_type: responseType,
@@ -821,7 +817,7 @@ export async function completePayment(agreementId: string): Promise<CompraAcuerd
 export async function sendPurchaseStep(
   conversationId: string,
   senderId: string,
-  senderName: string,
+  _senderName: string,
   stepType: PurchaseStepType,
   content: string,
   additionalData?: {
@@ -840,7 +836,6 @@ export async function sendPurchaseStep(
     body: JSON.stringify({
       conversation_id: conversationId,
       sender_id: senderId,
-      sender_name: senderName,
       content,
       type: 'purchase_step',
       purchase_step: stepType,
