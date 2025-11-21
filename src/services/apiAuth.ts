@@ -21,8 +21,17 @@ export function clearTokens() {
 function decodeJwtPayload(token: string): unknown {
   try {
     const part = token.split('.')[1];
-    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json);
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+    const binary = atob(b64 + pad);
+    const bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
+    let jsonStr: string;
+    try {
+      jsonStr = new TextDecoder('utf-8').decode(bytes);
+    } catch {
+      jsonStr = decodeURIComponent([...binary].map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    }
+    return JSON.parse(jsonStr);
   } catch { return {}; }
 }
 
