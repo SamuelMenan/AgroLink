@@ -121,10 +121,20 @@ export default function Products() {
         )}
         {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
         {loading ? (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({length:6}).map((_,i)=> (
-              <div key={i} className="h-56 animate-pulse rounded-xl border border-gray-100 bg-gray-50" />
-            ))}
+          <div className="space-y-8">
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="relative h-20 w-20">
+                <div className="absolute inset-0 rounded-full border-4 border-green-200"></div>
+                <div className="absolute inset-0 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
+              </div>
+              <p className="mt-6 text-base font-medium text-gray-700">Cargando productos...</p>
+              <p className="mt-1 text-sm text-gray-500">Esto puede tardar unos segundos</p>
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({length:6}).map((_,i)=> (
+                <div key={i} className="h-56 animate-pulse rounded-xl border border-gray-100 bg-gray-50" />
+              ))}
+            </div>
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-600">No se encontraron coincidencias.</div>
