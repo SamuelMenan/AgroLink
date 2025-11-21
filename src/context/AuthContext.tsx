@@ -10,7 +10,7 @@ type AuthContextValue = {
   signOut: () => Promise<void>
   signUpWithEmail: (params: { fullName: string; email: string; password: string; phone?: string }) => Promise<{ error?: string }>
   signInWithEmail: (params: { email: string; password: string }) => Promise<{ error?: string }>
-  signInWithCredentials: (params: { identifier: string; password: string }) => Promise<{ error?: string }>
+  signInWithCredentials: (params: { identifier: string; password: string; captchaToken?: string }) => Promise<{ error?: string }>
   signInWithGoogle: (redirectTo?: string) => Promise<void>
   signInWithFacebook: (redirectTo?: string) => Promise<void>
   resetPassword: (email: string) => Promise<{ error?: string }>
@@ -159,11 +159,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = url
   }
 
-  const signInWithCredentials: AuthContextValue['signInWithCredentials'] = async ({ identifier, password }) => {
+  const signInWithCredentials: AuthContextValue['signInWithCredentials'] = async ({ identifier, password, captchaToken }) => {
     const normalized = identifier.trim()
     const isPhone = /^\+?\d{7,15}$/.test(normalized) || /^\d{7,15}$/.test(normalized.replace(/\s|-/g, ''))
     try {
-      const resp = isPhone ? await signInPhone(normalized, password) : await signInEmail(normalized, password)
+      const resp = isPhone ? await signInPhone(normalized, password, captchaToken) : await signInEmail(normalized, password, captchaToken)
       setUser(deriveUserFromTokens(resp))
       return {}
     } catch (e) {

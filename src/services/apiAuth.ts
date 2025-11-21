@@ -320,9 +320,11 @@ export async function signUp(fullName: string, email: string, password: string, 
   }
 }
 
-export async function signInEmail(email: string, password: string) {
+export async function signInEmail(email: string, password: string, captchaToken?: string) {
   try {
-    const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
+    const body: Record<string, unknown> = { email, password };
+    if (captchaToken) body[captchaFieldName()] = captchaToken;
+    const resp = await post(`${AUTH_PREFIX}/sign-in`, body);
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     try { await warmupProxy(); } catch { /* ignore */ }
     return resp;
@@ -349,9 +351,11 @@ export async function signInEmail(email: string, password: string) {
   }
 }
 
-export async function signInPhone(phone: string, password: string) {
+export async function signInPhone(phone: string, password: string, captchaToken?: string) {
   try {
-    const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
+    const body: Record<string, unknown> = { phone, password };
+    if (captchaToken) body[captchaFieldName()] = captchaToken;
+    const resp = await post(`${AUTH_PREFIX}/sign-in`, body);
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     try { await warmupProxy(); } catch { /* ignore */ }
     return resp;
@@ -431,3 +435,8 @@ const BASE_URL = resolveBaseUrl();
 // Usar siempre ruta proxied para evitar fallos de CORS/502 en redirecciones OAuth.
 export const getOAuthStartUrl = (provider: string, next: string) =>
   `/api/proxy/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+
+function captchaFieldName() {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+  return env.VITE_RECAPTCHA_SITE_KEY ? 'recaptcha_token' : 'hcaptcha_token';
+}
