@@ -10,7 +10,7 @@ type CreateInput = {
   name: string
   description: string
   price: number
-  quantity: number
+  quantity: string
   category: string
   images: File[]
   location?: string
@@ -106,10 +106,10 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id' | 'user_id' | 'created_at'>>): Promise<Product> {
-  const res = await apiFetch(`/api/v1/products-update`, { 
-    method: 'POST', 
-    headers: { 'Content-Type': 'application/json' }, 
-    body: JSON.stringify({ id, patch }) 
+  const res = await apiFetch(`/api/v1/products/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch)
   })
   if (!res.ok) throw new Error('Error actualizando producto')
   const data = await res.json()
@@ -117,10 +117,8 @@ export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const res = await apiFetch(`/api/v1/products-delete`, { 
-    method: 'POST',
-    body: JSON.stringify({ id }),
-    headers: { 'Content-Type': 'application/json' }
+  const res = await apiFetch(`/api/v1/products/${id}`, {
+    method: 'DELETE'
   })
   if (!res.ok) throw new Error('Error eliminando producto')
 }
