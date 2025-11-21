@@ -17,6 +17,10 @@ export default function Dashboard() {
           <h2 className="font-semibold">Mis publicaciones</h2>
           <p className="text-sm text-gray-600">Edita o elimina tus publicaciones.</p>
         </a>
+        <a href="/dashboard/catalog" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
+          <h2 className="font-semibold">Catálogo</h2>
+          <p className="text-sm text-gray-600">Sincroniza y mejora la información de todos tus productos.</p>
+        </a>
         <a href="/messages" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
           <h2 className="font-semibold">Mensajes</h2>
           <p className="text-sm text-gray-600">Chatea directamente con compradores y vendedores.</p>

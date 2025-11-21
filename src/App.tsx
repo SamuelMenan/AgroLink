@@ -20,6 +20,7 @@ import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'
 import OAuthCallback from './pages/OAuthCallback'
+import CatalogManagement from './pages/dashboard/CatalogManagement'
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
           <Route path="/messages" element={<Messages />} />
           <Route path="/dashboard/orders" element={<OrdersDashboard />} />
           <Route path="/dashboard/settings" element={<AccountPrivacy />} />
+          <Route path="/dashboard/catalog" element={<CatalogManagement />} />
         </Route>
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />

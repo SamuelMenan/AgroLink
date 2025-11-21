@@ -173,6 +173,39 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     return haversineKm(userLat, userLng, p.lat, p.lng)
   }, [userLat, userLng, p.lat, p.lng])
   const [rating, setRating] = useState<{avg:number|null,count:number}>({ avg: null, count: 0 })
+  
+  // Enhanced features for agricultural products
+  const getConditionLabel = (condition?: string) => {
+    switch(condition) {
+      case 'fresh': return 'Fresco'
+      case 'organic': return 'Orgánico'
+      case 'conventional': return 'Convencional'
+      default: return null
+    }
+  }
+  
+  const getConditionColor = (condition?: string) => {
+    switch(condition) {
+      case 'fresh': return 'bg-green-100 text-green-800'
+      case 'organic': return 'bg-emerald-100 text-emerald-800'
+      case 'conventional': return 'bg-blue-100 text-blue-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+  
+  const formatAgriculturalQuantity = (quantity: string) => {
+    // Format quantity with proper agricultural units
+    if (quantity.includes('arroba')) {
+      const value = quantity.replace('arroba', '').trim()
+      return `${value} @ (${parseFloat(value) * 12.5} kg)`
+    }
+    if (quantity.includes('fanega')) {
+      const value = quantity.replace('fanega', '').trim()
+      return `${value} fan (${parseFloat(value) * 6400} m²)`
+    }
+    return quantity
+  }
+  
   useEffect(()=>{
     let alive = true
     ;(async ()=>{
@@ -275,40 +308,102 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     setTimeout(()=> setAdded(false), 1200)
   }
   return (
-    <div className="overflow-hidden rounded-xl border border-green-100 bg-white p-4 shadow-sm">
-      {firstImage ? (
-        <img src={firstImage} alt={p.name} className="h-40 w-full rounded-md object-cover" />
-      ) : (
-        <div className="h-40 w-full rounded-md bg-gradient-to-br from-green-50 to-gray-100" />
-      )}
-      <h3 className="mt-3 text-lg font-semibold">{p.name}</h3>
-      <p className="line-clamp-2 text-sm text-gray-600">{p.description}</p>
-      <div className="mt-2 flex items-center justify-between text-sm text-gray-700">
-        <span className="font-semibold text-green-700">${p.price.toLocaleString()}</span>
-        <span>{p.quantity} u.</span>
+    <div className="overflow-hidden rounded-xl border border-green-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+      {/* Enhanced Image Section with Condition Badge */}
+      <div className="relative">
+        {firstImage ? (
+          <img src={firstImage} alt={p.name} className="h-40 w-full rounded-md object-cover" />
+        ) : (
+          <div className="h-40 w-full rounded-md bg-gradient-to-br from-green-50 to-gray-100 flex items-center justify-center">
+            <span className="material-icons-outlined text-4xl text-green-300">agriculture</span>
+          </div>
+        )}
+        {p.condition && (
+          <span className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${getConditionColor(p.condition)}`}>
+            {getConditionLabel(p.condition)}
+          </span>
+        )}
+        {p.stock_available === false && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center">
+            <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">Agotado</span>
+          </div>
+        )}
       </div>
-      <div className="mt-1 flex items-center justify-between text-xs text-gray-600">
+      
+      {/* Enhanced Product Information */}
+      <h3 className="mt-3 text-lg font-semibold text-gray-900">{p.name}</h3>
+      
+      {/* Category and Location */}
+      <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full capitalize">{p.category}</span>
+        {(p.department || p.municipality) && (
+          <span className="flex items-center gap-1">
+            <span className="material-icons-outlined text-[14px]">location_on</span>
+            {p.municipality ? `${p.municipality}, ${p.department}` : p.department}
+          </span>
+        )}
+      </div>
+      
+      {/* Enhanced Description */}
+      <p className="mt-2 line-clamp-2 text-sm text-gray-600">
+        {p.detailed_description || p.description}
+      </p>
+      
+      {/* Enhanced Pricing Section */}
+      <div className="mt-3 space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-green-700 text-lg">${p.price.toLocaleString()}</span>
+          <span className="text-sm text-gray-600">{formatAgriculturalQuantity(p.quantity)}</span>
+        </div>
+        
+        {/* Additional Pricing Information */}
+        {(p.price_per_unit || p.price_per_kilo) && (
+          <div className="text-xs text-gray-500 space-y-1">
+            {p.price_per_unit && (
+              <div className="flex justify-between">
+                <span>Precio por unidad:</span>
+                <span className="font-medium">${p.price_per_unit.toLocaleString()}</span>
+              </div>
+            )}
+            {p.price_per_kilo && (
+              <div className="flex justify-between">
+                <span>Precio por kilo:</span>
+                <span className="font-medium">${p.price_per_kilo.toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Enhanced Rating and Distance */}
+      <div className="mt-2 flex items-center justify-between text-xs">
         {rating.avg!=null ? (
           <span title={`${rating.avg} de 5 (${rating.count})`} className="inline-flex items-center gap-1">
             <span className="text-amber-500">{'★'.repeat(Math.round(rating.avg))}{'☆'.repeat(5-Math.round(rating.avg))}</span>
-            <span>{rating.avg.toFixed(1)} ({rating.count})</span>
+            <span className="text-gray-700">{rating.avg.toFixed(1)} ({rating.count})</span>
           </span>
         ) : (
-          <span className="text-gray-400">Sin calificaciones</span>
+          <span className="text-gray-400 flex items-center gap-1">
+            <span className="material-icons-outlined text-[14px]">star_outline</span>
+            Sin calificaciones
+          </span>
         )}
-        <span />
-      </div>
-      <div className="mt-1 flex items-center justify-between text-xs text-gray-600">
-        <span>{p.location || 'Sin ubicación'}</span>
         {distanceKm!=null && Number.isFinite(distanceKm) && (
-          <span>{distanceKm.toFixed(1)} km</span>
+          <span className="flex items-center gap-1 text-gray-600">
+            <span className="material-icons-outlined text-[14px]">directions_car</span>
+            {distanceKm.toFixed(1)} km
+          </span>
         )}
       </div>
       {isOwner ? (
-        <div className="mt-3 rounded-xl border border-green-200 bg-white p-3">
-          <p className="text-sm text-gray-600">Este es tu producto.</p>
-          <div className="mt-3 flex gap-2">
-            <Link to={`/dashboard/products/${p.id}/edit`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-600 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">
+        <div className="mt-4 rounded-xl border border-green-200 bg-white p-3">
+          <p className="text-sm text-gray-600 mb-3">Este es tu producto.</p>
+          <div className="flex gap-2">
+            <Link 
+              to={`/dashboard/products/${p.id}/edit`} 
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-600 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 transition-colors"
+              aria-label={`Editar ${p.name}`}
+            >
               <span className="material-icons-outlined text-[18px]">edit</span>
               Editar
             </Link>
@@ -325,31 +420,37 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
                   setErr(m)
                 }
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-600 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-600 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors"
+              aria-label={`Eliminar ${p.name}`}
             >
               <span className="material-icons-outlined text-[18px]">delete</span>
               Eliminar
             </button>
           </div>
-          {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
+          {err && <p className="mt-2 text-xs text-red-600" role="alert">{err}</p>}
         </div>
       ) : (
-        <>
-          {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
-          <div className="mt-3 rounded-xl border border-green-200 bg-white">
-            <div className="border-b border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-900">Envía un mensaje al vendedor</div>
+        <div className="mt-4 space-y-3">
+          {err && <p className="text-xs text-red-600" role="alert">{err}</p>}
+          
+          {/* Enhanced Contact Section */}
+          <div className="rounded-xl border border-green-200 bg-white">
+            <div className="border-b border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-900">
+              Contactar al vendedor
+            </div>
             <div className="p-3">
               <textarea
                 value={msgText}
                 onChange={(e)=> setMsgText(e.target.value)}
                 rows={2}
-                className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+                className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20 transition-colors"
                 placeholder="Hola. ¿Sigue estando disponible?"
+                aria-label="Mensaje para el vendedor"
               />
               {msgSent ? (
                 <a
                   href={`/messages?with=${encodeURIComponent(p.user_id)}`}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
                 >
                   <span className="material-icons-outlined text-[18px]">chat</span>
                   Abrir chat
@@ -357,18 +458,32 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
               ) : (
                 <button
                   onClick={sendMarketplaceMessage}
-                  disabled={sendingMsg}
-                  className="mt-3 w-full rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={sendingMsg || p.stock_available === false}
+                  className="mt-3 w-full rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+                  aria-label="Enviar mensaje al vendedor"
                 >
-                  {sendingMsg ? 'Enviando…' : 'Enviar'}
+                  {sendingMsg ? 'Enviando…' : p.stock_available === false ? 'Producto agotado' : 'Enviar mensaje'}
                 </button>
               )}
             </div>
           </div>
-          <button onClick={onAddToCart} className="mt-2 w-full rounded-md border border-amber-600 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-600 hover:text-white">
-            {added ? 'Agregado ✓' : 'Agregar al carrito'}
+          
+          {/* Enhanced Add to Cart Button */}
+          <button 
+            onClick={onAddToCart} 
+            disabled={p.stock_available === false}
+            className={`w-full rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
+              added 
+                ? 'border-green-600 bg-green-600 text-white' 
+                : p.stock_available === false
+                ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white'
+            }`}
+            aria-label={added ? 'Producto agregado' : `Agregar ${p.name} al carrito`}
+          >
+            {added ? 'Agregado ✓' : p.stock_available === false ? 'Producto agotado' : 'Agregar al carrito'}
           </button>
-        </>
+        </div>
       )}
     </div>
   )
