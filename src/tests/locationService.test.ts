@@ -11,7 +11,7 @@ describe('LocationService', () => {
     })
 
     it('should return empty array for invalid department', () => {
-      const result = getMunicipalitiesByDepartment('99')
+      const result = getMunicipalitiesByDepartment('XX')
       expect(result).toHaveLength(0)
     })
 
