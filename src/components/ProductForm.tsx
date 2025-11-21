@@ -9,6 +9,7 @@ import { ValidatedInput, ValidatedTextArea } from '../hooks/useValidation.tsx'
 import { VALIDATION_RULES } from '../utils/inputValidation'
 import { formatAgriculturalQuantity } from '../utils/agriculturalUnits'
 import { AgriculturalTerm } from './GlossaryTooltip'
+import ProductAssistant from './ProductAssistant'
 
 export type ProductFormValues = {
   name: string
@@ -133,6 +134,14 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
           />
           <p className="mt-1 text-xs text-gray-500">Máx. 200 caracteres</p>
           {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
+          <ProductAssistant
+            context={{ name: values.name, category: values.category, quantity: values.quantity, condition: values.condition, location: values.location }}
+            onUseDescription={(text)=> handleInputChange('description', text)}
+            onUsePrice={(p)=> {
+              if (p.unit) handleInputChange('pricePerUnit', p.unit)
+              if (p.kilo) handleInputChange('pricePerKilo', p.kilo)
+            }}
+          />
         </div>
 
         {/* Detailed Description with Rich Text Editor */}
