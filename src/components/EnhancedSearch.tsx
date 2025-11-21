@@ -72,7 +72,9 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
   }, [filters.q, updateSuggestions])
 
   const handleInputChange = (field: keyof EnhancedSearchFilters, value: string | string[]) => {
-    const newFilters = { ...filters, [field]: value }
+    // Remove leading spaces only from search query
+    const processedValue = field === 'q' && typeof value === 'string' ? value.trimStart() : value
+    const newFilters = { ...filters, [field]: processedValue }
     onFiltersChange(newFilters)
   }
 
