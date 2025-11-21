@@ -466,6 +466,46 @@ export default async function handler(req, res) {
         return res.status(insResp.status).json({ error: 'No se pudo agregar participante', details: await insResp.text() })
       }
       return res.status(201).json({ ok: true })
+    } else if (action === 'pending') {
+      // Lista conversaciones "pendientes" para el usuario autenticado: aquellas donde aún no es participante
+      // GET /api/conversations?action=pending
+      if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido (pending)' })
+      if (!authUserId) return res.status(401).json({ error: 'Usuario no autenticado (pending)' })
+      const url = `${SUPABASE_URL}/rest/v1/conversations?select=id,product_id,created_at,updated_at,conversation_participants(user_id)`
+      const resp = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}` } })
+      if (!resp.ok) return res.status(resp.status).json({ error: 'Error al obtener pendientes', details: await resp.text() })
+      const all = await resp.json()
+      const pending = all.filter(c => Array.isArray(c.conversation_participants) && !c.conversation_participants.some(p => p.user_id === authUserId))
+      return res.status(200).json(pending)
+    } else if (action === 'join') {
+      // Permite al usuario autenticado unirse a una conversación pendiente
+      // POST /api/conversations?action=join&id=<conversation_id>
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido (join)' })
+      if (!targetId) return res.status(400).json({ error: 'id requerido' })
+      if (!authUserId) return res.status(401).json({ error: 'Usuario no autenticado (join)' })
+      // Verificar si ya es participante para evitar duplicados (aunque usaremos ignore-duplicates)
+      const checkUrl = `${SUPABASE_URL}/rest/v1/conversation_participants?conversation_id=eq.${targetId}&user_id=eq.${authUserId}&select=user_id`
+      const checkResp = await fetch(checkUrl, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}` } })
+      if (checkResp.ok) {
+        const existing = await checkResp.json()
+        if (Array.isArray(existing) && existing.length > 0) {
+          return res.status(200).json({ ok: true, already_joined: true })
+        }
+      }
+      const insResp = await fetch(`${SUPABASE_URL}/rest/v1/conversation_participants`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=ignore-duplicates,return=minimal'
+        },
+        body: JSON.stringify({ conversation_id: targetId, user_id: authUserId })
+      })
+      if (!insResp.ok && insResp.status !== 409) {
+        return res.status(insResp.status).json({ error: 'No se pudo unir a la conversación', details: await insResp.text() })
+      }
+      return res.status(201).json({ ok: true })
     } else {
       return res.status(405).json({ error: 'Acción no soportada' })
     }

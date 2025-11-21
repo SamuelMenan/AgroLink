@@ -777,3 +777,47 @@ export async function markMessagesAsRead(conversationId: string, userId: string)
     throw new Error('Error al marcar mensajes como leídos')
   }
 }
+
+// List pending conversations (those where current user is not yet a participant)
+export async function getPendingConversations(): Promise<Conversation[]> {
+  const token = getAccessToken()
+  if (!token) throw new Error('No autenticado')
+
+  try {
+    return await apiClient.get<Conversation[]>(`/api/v1/conversations?action=pending`)
+  } catch {
+    // Fallback a fetch directo
+    const resp = await fetch(`${API_BASE}/conversations?action=pending`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (!resp.ok) {
+      const txt = await resp.text()
+      throw new Error(`Error obteniendo pendientes: ${resp.status} ${txt}`)
+    }
+    return resp.json()
+  }
+}
+
+// Join a pending conversation by id
+export async function joinConversation(conversationId: string): Promise<{ ok: boolean }> {
+  const token = getAccessToken()
+  if (!token) throw new Error('No autenticado')
+
+  try {
+    return await apiClient.post<{ ok: boolean }>(`/api/v1/conversations?action=join&id=${conversationId}`, {})
+  } catch {
+    const resp = await fetch(`${API_BASE}/conversations?action=join&id=${conversationId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({})
+    })
+    if (!resp.ok) {
+      const txt = await resp.text()
+      throw new Error(`Error al unirse: ${resp.status} ${txt}`)
+    }
+    return resp.json()
+  }
+}

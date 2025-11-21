@@ -17,7 +17,9 @@ import {
   sendQuickRequest,
   sendQuickResponse,
   sendPurchaseStep,
-  markMessagesAsRead
+  markMessagesAsRead,
+  getPendingConversations,
+  joinConversation
 } from '../services/messagingService'
 import { Send, MessageCircle, ShoppingCart } from 'lucide-react'
 
@@ -39,6 +41,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [pendingConvs, setPendingConvs] = useState<Conversation[]>([])
   const [showQuickRequests, setShowQuickRequests] = useState(false)
   const [showPurchaseFlow, setShowPurchaseFlow] = useState(false)
   const [currentPurchaseStep, setCurrentPurchaseStep] = useState(0)
@@ -59,23 +62,33 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
   }, [messages])
 
   // Load conversations on mount
+  // Initial effect: load conversations & pending, optionally create
   useEffect(() => {
-    if (user) {
-      loadConversations()
-      
-      // If we have product data but no initial conversation, create a new conversation
-      if (productData && !initialConversation) {
-        createNewConversation()
-      }
+    if (!user) return
+    loadConversations()
+    loadPending()
+    if (productData && !initialConversation) {
+      createNewConversation()
     }
-  }, [user])
+    // We intentionally do not include function refs to avoid re-runs due to new identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, productData, initialConversation])
 
   // Load messages when conversation is selected
-  useEffect(() => {
-    if (selectedConversation) {
-      loadMessages(selectedConversation.id)
-      markAsRead(selectedConversation.id)
+  const markAsRead = async (conversationId: string) => {
+    if (!user) return
+    try {
+      await markMessagesAsRead(conversationId, user.id)
+    } catch (error) {
+      console.error('Error marking messages as read:', error)
     }
+  }
+
+  useEffect(() => {
+    if (!selectedConversation) return
+    loadMessages(selectedConversation.id)
+    markAsRead(selectedConversation.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation])
 
   const loadConversations = async () => {
@@ -89,6 +102,16 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
       console.error('Error loading conversations:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadPending = async () => {
+    if (!user) return
+    try {
+      const data = await getPendingConversations()
+      setPendingConvs(data)
+    } catch {
+      console.warn('Sin conversaciones pendientes')
     }
   }
 
@@ -152,15 +175,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
     }
   }
 
-  const markAsRead = async (conversationId: string) => {
-    if (!user) return
-    
-    try {
-      await markMessagesAsRead(conversationId, user.id)
-    } catch (error) {
-      console.error('Error marking messages as read:', error)
-    }
-  }
+  // markAsRead moved above with useCallback
 
   const handleSendMessage = async () => {
     if (!user || !selectedConversation || !newMessage.trim()) return
@@ -219,34 +234,51 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
     setCurrentPurchaseStep(0)
   }
 
-  const handlePurchaseStep = async (stepData: any) => {
+  type DeliveryMethodType = typeof purchaseData.deliveryMethod
+  type PaymentMethodType = typeof purchaseData.paymentMethod
+  interface StepData {
+    quantity?: number
+    finalPrice?: number
+    deliveryMethod?: DeliveryMethodType
+    paymentMethod?: PaymentMethodType
+  }
+  const handlePurchaseStep = async (stepData: StepData) => {
     if (!user || !selectedConversation) return
     
-    const newPurchaseData = { ...purchaseData, ...stepData }
+    const newPurchaseData: typeof purchaseData = {
+      quantity: stepData.quantity ?? purchaseData.quantity,
+      finalPrice: stepData.finalPrice ?? purchaseData.finalPrice,
+      deliveryMethod: (stepData.deliveryMethod ?? purchaseData.deliveryMethod) as DeliveryMethodType,
+      paymentMethod: (stepData.paymentMethod ?? purchaseData.paymentMethod) as PaymentMethodType
+    }
     setPurchaseData(newPurchaseData)
     
     let message = ''
     let stepType = ''
     
     switch (currentPurchaseStep) {
-      case 0: // Quantity
+      case 0: {
         message = `Perfecto, confirmamos ${stepData.quantity} unidades.`
         stepType = 'quantity_confirmation'
         break
-      case 1: // Price
-        message = `Acordamos el precio final de $${stepData.finalPrice.toLocaleString()}.`
+      }
+      case 1: {
+        message = `Acordamos el precio final de $${stepData.finalPrice?.toLocaleString()}.`
         stepType = 'price_final'
         break
-      case 2: // Delivery
+      }
+      case 2: {
         const deliveryMethod = DELIVERY_METHODS.find(d => d.value === stepData.deliveryMethod)
         message = `Confirmamos entrega: ${deliveryMethod?.label}.`
         stepType = 'delivery_method'
         break
-      case 3: // Payment
+      }
+      case 3: {
         const paymentMethod = PAYMENT_METHODS.find(p => p.value === stepData.paymentMethod)
         message = `Confirmamos pago: ${paymentMethod?.label}.`
         stepType = 'payment_method'
         break
+      }
     }
     
     try {
@@ -254,7 +286,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
         selectedConversation.id,
         user.id,
         user.full_name || 'Comprador',
-        stepType as any,
+        stepType as 'quantity_confirmation' | 'price_final' | 'delivery_method' | 'payment_method',
         message,
         stepData
       )
@@ -410,7 +442,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
             <label className="block text-sm font-medium text-gray-700 mb-2">Método de entrega:</label>
             <select
               value={purchaseData.deliveryMethod}
-              onChange={(e) => setPurchaseData({...purchaseData, deliveryMethod: e.target.value as any})}
+              onChange={(e) => setPurchaseData({...purchaseData, deliveryMethod: e.target.value as typeof purchaseData.deliveryMethod})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             >
               {DELIVERY_METHODS.map(method => (
@@ -431,7 +463,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
             <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago:</label>
             <select
               value={purchaseData.paymentMethod}
-              onChange={(e) => setPurchaseData({...purchaseData, paymentMethod: e.target.value as any})}
+              onChange={(e) => setPurchaseData({...purchaseData, paymentMethod: e.target.value as typeof purchaseData.paymentMethod})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             >
               {PAYMENT_METHODS.map(method => (
@@ -514,6 +546,26 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
                 </p>
               </div>
             ))
+          )}
+          {pendingConvs.length > 0 && (
+            <div className="p-2 border-t">
+              <p className="text-xs text-gray-500 mb-2">Conversaciones pendientes</p>
+              {pendingConvs.map(c => (
+                <div key={c.id} className="flex items-center justify-between p-2 rounded hover:bg-gray-100">
+                  <span className="text-sm truncate">Prod. {c.product_id || c.id.substring(0,8)}</span>
+                  <button
+                    onClick={async () => {
+                      await joinConversation(c.id)
+                      await loadConversations()
+                      setPendingConvs(prev => prev.filter(pc => pc.id !== c.id))
+                    }}
+                    className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Unirme
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
