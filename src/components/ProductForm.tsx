@@ -23,7 +23,7 @@ export type ProductFormValues = {
   department?: string
   municipality?: string
   detailedDescription?: string
-  condition?: 'new' | 'used' | 'seasonal'
+  condition?: 'fresh' | 'organic' | 'conventional'
   stockAvailable?: boolean
 }
 
@@ -48,7 +48,7 @@ const initialValues: ProductFormValues = {
   department: '',
   municipality: '',
   detailedDescription: '',
-  condition: 'new',
+  condition: 'fresh',
   stockAvailable: true,
 }
 
@@ -193,15 +193,15 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
             {errors.quantity && <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Condición del producto</label>
+            <label className="block text-sm font-medium text-gray-700">Tipo de cultivo</label>
             <select 
-              value={values.condition || 'new'} 
+              value={values.condition || 'fresh'} 
               onChange={(e) => handleInputChange('condition', e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
             >
-              <option value="new">Nuevo</option>
-              <option value="used">Usado</option>
-              <option value="seasonal">De temporada</option>
+              <option value="fresh">Fresco (recién cosechado)</option>
+              <option value="organic">Orgánico certificado</option>
+              <option value="conventional">Convencional</option>
             </select>
             {errors.condition && <p className="mt-1 text-sm text-red-600">{errors.condition}</p>}
           </div>

@@ -21,9 +21,9 @@ export default function ProductPreview({ formData, onClose }: ProductPreviewProp
 
   const getConditionLabel = (condition: string) => {
     switch (condition) {
-      case 'new': return 'Nuevo'
-      case 'used': return 'Usado'
-      case 'seasonal': return 'De temporada'
+      case 'fresh': return 'Fresco'
+      case 'organic': return 'Orgánico'
+      case 'conventional': return 'Convencional'
       default: return 'Sin especificar'
     }
   }
