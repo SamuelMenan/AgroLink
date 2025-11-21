@@ -84,14 +84,39 @@ export async function createConversation(
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorText = await response.text()
+      let errorData: { error?: string } = {}
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      
       console.error('[createConversation] Error response:', {
         status: response.status,
         statusText: response.statusText,
         errorData,
-        url: `${API_BASE}/conversations`
+        url: `${API_BASE}/conversations`,
+        requestData: {
+          buyer_id: currentUserId,
+          seller_id: participantId,
+          product_id: productId,
+          initial_message: initialMessage || 'Hola. ¿Sigue estando disponible?'
+        },
+        tokenLength: token.length,
+        tokenPreview: token.substring(0, 20) + '...'
       })
-      throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`)
+      
+      let errorMessage = 'Error al crear la conversación'
+      if (response.status === 403) {
+        errorMessage = 'No tienes permisos para crear esta conversación. Por favor, verifica que estás autenticado.'
+      } else if (response.status === 401) {
+        errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      } else if (errorData.error) {
+        errorMessage = errorData.error
+      }
+      
+      throw new Error(errorMessage)
     }
 
     return response.json()
@@ -122,14 +147,45 @@ export async function createConversation(
 
 // Get user's conversations
 export async function getConversations(userId: string): Promise<Conversation[]> {
+  const token = getAccessToken()
+  if (!token) {
+    throw new Error('No autenticado')
+  }
+
+  console.log('[getConversations] Obteniendo conversaciones para usuario:', userId)
+
   const response = await fetch(`${API_BASE}/conversations?user_id=${userId}`, {
     headers: {
-      'Authorization': `Bearer ${getAccessToken()}`
+      'Authorization': `Bearer ${token}`
     }
   })
 
   if (!response.ok) {
-    throw new Error('Error al obtener conversaciones')
+    const errorText = await response.text()
+    let errorData: { error?: string } = {}
+    try {
+      errorData = JSON.parse(errorText)
+    } catch {
+      errorData = { error: errorText }
+    }
+    
+    console.error('[getConversations] Error response:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+      url: `${API_BASE}/conversations?user_id=${userId}`
+    })
+    
+    let errorMessage = 'Error al obtener conversaciones'
+    if (response.status === 403) {
+      errorMessage = 'No tienes permisos para ver estas conversaciones.'
+    } else if (response.status === 401) {
+      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+    } else if (errorData.error) {
+      errorMessage = errorData.error
+    }
+    
+    throw new Error(errorMessage)
   }
 
   return response.json()
@@ -137,14 +193,47 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
 // Get messages from a conversation
 export async function getMessages(conversationId: string): Promise<Message[]> {
+  const token = getAccessToken()
+  if (!token) {
+    throw new Error('No autenticado')
+  }
+
+  console.log('[getMessages] Obteniendo mensajes para conversación:', conversationId)
+
   const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
     headers: {
-      'Authorization': `Bearer ${getAccessToken()}`
+      'Authorization': `Bearer ${token}`
     }
   })
 
   if (!response.ok) {
-    throw new Error('Error al obtener mensajes')
+    const errorText = await response.text()
+    let errorData: { error?: string } = {}
+    try {
+      errorData = JSON.parse(errorText)
+    } catch {
+      errorData = { error: errorText }
+    }
+    
+    console.error('[getMessages] Error response:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+      url: `${API_BASE}/conversations/${conversationId}/messages`
+    })
+    
+    let errorMessage = 'Error al obtener mensajes'
+    if (response.status === 403) {
+      errorMessage = 'No tienes permisos para ver los mensajes de esta conversación.'
+    } else if (response.status === 401) {
+      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+    } else if (response.status === 404) {
+      errorMessage = 'La conversación no existe o fue eliminada.'
+    } else if (errorData.error) {
+      errorMessage = errorData.error
+    }
+    
+    throw new Error(errorMessage)
   }
 
   return response.json()
@@ -158,11 +247,24 @@ export async function sendMessage(
   content: string,
   isFromBuyer: boolean
 ): Promise<Message> {
+  const token = getAccessToken()
+  if (!token) {
+    throw new Error('No autenticado')
+  }
+
+  console.log('[sendMessage] Enviando mensaje:', {
+    conversationId,
+    senderId,
+    senderName,
+    contentLength: content.length,
+    isFromBuyer
+  })
+
   const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getAccessToken()}`
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -175,7 +277,41 @@ export async function sendMessage(
   })
 
   if (!response.ok) {
-    throw new Error('Error al enviar mensaje')
+    const errorText = await response.text()
+    let errorData: { error?: string } = {}
+    try {
+      errorData = JSON.parse(errorText)
+    } catch {
+      errorData = { error: errorText }
+    }
+    
+    console.error('[sendMessage] Error response:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+      url: `${API_BASE}/conversations/${conversationId}/messages`,
+      requestData: {
+        conversation_id: conversationId,
+        sender_id: senderId,
+        sender_name: senderName,
+        content,
+        type: 'text',
+        is_from_buyer: isFromBuyer
+      }
+    })
+    
+    let errorMessage = 'Error al enviar mensaje'
+    if (response.status === 403) {
+      errorMessage = 'No tienes permisos para enviar mensajes en esta conversación.'
+    } else if (response.status === 401) {
+      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+    } else if (response.status === 404) {
+      errorMessage = 'La conversación no existe o fue eliminada.'
+    } else if (errorData.error) {
+      errorMessage = errorData.error
+    }
+    
+    throw new Error(errorMessage)
   }
 
   return response.json()
@@ -225,8 +361,7 @@ export async function sendQuickResponse(
   conversationId: string,
   sellerId: string,
   sellerName: string,
-  responseType: QuickResponseType,
-  _originalMessageId: string
+  responseType: QuickResponseType
 ): Promise<Message> {
   const response = QUICK_RESPONSES.find(r => r.type === responseType)
   if (!response) {
