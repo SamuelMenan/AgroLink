@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 
   const urlObj = new URL(req.url, 'http://localhost')
   const pathParts = urlObj.pathname.split('/')
-  const isUnreadCount = pathParts.includes('unread-count')
+  const isUnreadCount = pathParts.includes('unread-count') || urlObj.searchParams.get('action') === 'unread-count'
   const userId = urlObj.searchParams.get('user_id') || (isUnreadCount ? pathParts[pathParts.length - 1] : '')
 
   try {

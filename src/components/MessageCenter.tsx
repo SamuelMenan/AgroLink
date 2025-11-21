@@ -740,7 +740,13 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-              {messages.map(renderMessage)}
+              {Array.isArray(messages) && messages.length > 0 ? (
+                messages.map(renderMessage)
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  {Array.isArray(messages) ? 'No hay mensajes aún' : 'Cargando mensajes...'}
+                </div>
+              )}
               {showPurchaseFlow && renderPurchaseFlow()}
               <div ref={messagesEndRef} />
             </div>

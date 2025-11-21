@@ -364,13 +364,28 @@ export default async function handler(req, res) {
       // Validate conversation ID format (UUID)
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       if (!uuidRegex.test(targetId)) {
-        console.error('[conversations] Invalid conversation ID format:', targetId)
+        console.error('[conversations] Invalid conversation ID format:', {
+          targetId,
+          length: targetId?.length,
+          pattern: 'UUID v4 expected'
+        })
         return res.status(400).json({ 
           error: 'Formato de ID de conversación inválido',
           details: 'El ID debe ser un UUID válido',
-          received_id: targetId
+          received_id: targetId,
+          expected_format: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+          debug: {
+            length: targetId?.length,
+            matches_pattern: uuidRegex.test(targetId)
+          }
         })
       }
+      
+      console.log('[conversations] Valid conversation ID format:', {
+        targetId,
+        action: 'messages',
+        method: req.method
+      })
       
       if (req.method === 'GET') {
         try {

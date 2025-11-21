@@ -26,23 +26,34 @@ export async function listRecentNotifications(userId: string, limit = 12): Promi
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
-  const res = await apiFetch(`${API_BASE}/unread-count/${userId}`)
-  if (!res.ok) {
+  try {
+    // Try the endpoint-style URL first
+    const res = await apiFetch(`${API_BASE}/unread-count/${userId}`)
+    if (res.ok) {
+      const data = await res.json()
+      // Handle both old format (array) and new format (object with count)
+      if (Array.isArray(data)) {
+        return data.length
+      } else if (data && typeof data === 'object' && 'count' in data) {
+        return data.count || 0
+      }
+      return 0
+    }
+    
+    // If 405 Method Not Allowed, try query parameter approach
+    if (res.status === 405) {
+      console.warn('Unread count endpoint returned 405, trying query parameter approach')
+      const altRes = await apiFetch(`${API_BASE}?action=unread-count&user_id=${userId}`)
+      if (altRes.ok) {
+        const data = await altRes.json()
+        return data.count || 0
+      }
+    }
+    
     console.warn('Failed to get unread count, returning 0:', res.status)
     return 0
-  }
-  
-  try {
-    const data = await res.json()
-    // Handle both old format (array) and new format (object with count)
-    if (Array.isArray(data)) {
-      return data.length
-    } else if (data && typeof data === 'object' && 'count' in data) {
-      return data.count || 0
-    }
-    return 0
   } catch (error) {
-    console.error('Error parsing unread count response:', error)
+    console.error('Error getting unread count:', error)
     return 0
   }
 }
