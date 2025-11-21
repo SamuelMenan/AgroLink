@@ -10,7 +10,7 @@ type CreateInput = {
   name: string
   description: string
   price: number
-  quantity: string  // String to support units like "20 arrobas"
+  quantity: number
   category: string
   images: File[]
   location?: string
@@ -135,6 +135,11 @@ export type SearchFilters = {
   userLng?: number
   sort?: 'relevance' | 'price-asc' | 'price-desc' | 'distance'
   limit?: number
+  // Enhanced filters
+  minPrice?: number
+  maxPrice?: number
+  certifications?: string[]
+  season?: string
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -147,71 +152,33 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * c
 }
 
-// Simple cache for products with 5 minute TTL
-const productCache = new Map<string, { data: Product[], timestamp: number }>()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
-
-function getCacheKey(filters: SearchFilters): string {
-  return JSON.stringify(filters)
-}
-
 export async function listPublicProducts(filters: SearchFilters = {}): Promise<Product[]> {
-  const cacheKey = getCacheKey(filters)
-  const cached = productCache.get(cacheKey)
-  
-  // Return cached data if it's fresh (less than 5 minutes old)
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    console.log('[productService] Returning cached products')
-    return cached.data
-  }
-  
   const { q, category, locationText, distanceKm, userLat, userLng, sort = 'relevance', limit = 60 } = filters
   // Construir parámetros de consulta (búsqueda OR para términos).
   const parts: string[] = ['select=*', 'status=eq.activo', `limit=${limit}`]
   if (category) parts.push(`category=eq.${encodeURIComponent(category)}`)
   const orSegments: string[] = []
   if (q && q.trim()) {
-    const searchTerm = encodeURIComponent(q.trim())
-    orSegments.push(`name.ilike.*${searchTerm}*`, `description.ilike.*${searchTerm}*`)
+    const like = `%${q.trim()}%`
+    orSegments.push(`name.ilike.${like}`, `description.ilike.${like}`)
   }
   if (locationText && locationText.trim()) {
-    const locTerm = encodeURIComponent(locationText.trim())
-    orSegments.push(`location.ilike.*${locTerm}*`)
+    const likeLoc = `%${locationText.trim()}%`
+    orSegments.push(`location.ilike.${likeLoc}`)
   }
-  if (orSegments.length) parts.push(`or=(${orSegments.join(',')})`)
+  if (orSegments.length) parts.push(`or=${orSegments.join(',')}`)
   // order by created_at desc for relevance default
   parts.push('order=created_at.desc')
   const query = parts.join('&')
-  
-  try {
-    const res = await apiFetch(`/api/v1/products?q=${encodeURIComponent(query)}`)
-    if (!res.ok) {
-      // If request fails but we have stale cache, return it
-      if (cached) {
-        console.warn('[productService] Request failed, returning stale cache')
-        return cached.data
-      }
-      throw new Error('Error listando productos públicos')
-    }
-    let items = await res.json() as Product[]
-    // Client-side distance filter & sorting enhancements
-    if (distanceKm && userLat!=null && userLng!=null) {
-      items = items.filter(p => (p.lat!=null && p.lng!=null) && haversineKm(userLat, userLng, p.lat!, p.lng!) <= distanceKm)
-    }
-    items = sortItems(items, sort, userLat, userLng)
-    
-    // Cache the results
-    productCache.set(cacheKey, { data: items, timestamp: Date.now() })
-    
-    return items
-  } catch (error) {
-    // If network fails but we have stale cache, return it
-    if (cached) {
-      console.warn('[productService] Network error, returning stale cache:', error)
-      return cached.data
-    }
-    throw error
+  const res = await apiFetch(`/api/v1/products?q=${encodeURIComponent(query)}`)
+  if (!res.ok) throw new Error('Error listando productos públicos')
+  let items = await res.json() as Product[]
+  // Client-side distance filter & sorting enhancements
+  if (distanceKm && userLat!=null && userLng!=null) {
+    items = items.filter(p => (p.lat!=null && p.lng!=null) && haversineKm(userLat, userLng, p.lat!, p.lng!) <= distanceKm)
   }
+  items = sortItems(items, sort, userLat, userLng)
+  return items
 }
 
 function sortItems(items: Product[], sort: SearchFilters['sort'], userLat?: number, userLng?: number): Product[] {

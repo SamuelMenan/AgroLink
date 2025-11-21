@@ -85,7 +85,7 @@ export async function createConversation(
 
     if (!response.ok) {
       const errorText = await response.text()
-      let errorData: { error?: string } = {}
+      let errorData: { error?: string; details?: any; debug?: any } = {}
       try {
         errorData = JSON.parse(errorText)
       } catch {
@@ -104,14 +104,17 @@ export async function createConversation(
           initial_message: initialMessage || 'Hola. ¿Sigue estando disponible?'
         },
         tokenLength: token.length,
-        tokenPreview: token.substring(0, 20) + '...'
+        tokenPreview: token.substring(0, 20) + '...',
+        timestamp: new Date().toISOString()
       })
       
       let errorMessage = 'Error al crear la conversación'
       if (response.status === 403) {
-        errorMessage = 'No tienes permisos para crear esta conversación. Por favor, verifica que estás autenticado.'
+        errorMessage = errorData.debug?.message || 'No tienes permisos para crear esta conversación. Por favor, verifica que estás autenticado.'
       } else if (response.status === 401) {
-        errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+        errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      } else if (response.status === 500) {
+        errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
       } else if (errorData.error) {
         errorMessage = errorData.error
       }
@@ -162,7 +165,7 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
   if (!response.ok) {
     const errorText = await response.text()
-    let errorData: { error?: string } = {}
+    let errorData: { error?: string; details?: any; debug?: any } = {}
     try {
       errorData = JSON.parse(errorText)
     } catch {
@@ -173,14 +176,17 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
       status: response.status,
       statusText: response.statusText,
       errorData,
-      url: `${API_BASE}/conversations?user_id=${userId}`
+      url: `${API_BASE}/conversations?user_id=${userId}`,
+      timestamp: new Date().toISOString()
     })
     
     let errorMessage = 'Error al obtener conversaciones'
     if (response.status === 403) {
-      errorMessage = 'No tienes permisos para ver estas conversaciones.'
+      errorMessage = errorData.debug?.message || 'No tienes permisos para ver estas conversaciones.'
     } else if (response.status === 401) {
-      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+    } else if (response.status === 500) {
+      errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
     } else if (errorData.error) {
       errorMessage = errorData.error
     }
@@ -278,7 +284,7 @@ export async function sendMessage(
 
   if (!response.ok) {
     const errorText = await response.text()
-    let errorData: { error?: string } = {}
+    let errorData: { error?: string; details?: any; debug?: any } = {}
     try {
       errorData = JSON.parse(errorText)
     } catch {
@@ -297,16 +303,19 @@ export async function sendMessage(
         content,
         type: 'text',
         is_from_buyer: isFromBuyer
-      }
+      },
+      timestamp: new Date().toISOString()
     })
     
     let errorMessage = 'Error al enviar mensaje'
     if (response.status === 403) {
-      errorMessage = 'No tienes permisos para enviar mensajes en esta conversación.'
+      errorMessage = errorData.debug?.message || 'No tienes permisos para enviar mensajes en esta conversación.'
     } else if (response.status === 401) {
-      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
     } else if (response.status === 404) {
-      errorMessage = 'La conversación no existe o fue eliminada.'
+      errorMessage = errorData.debug?.message || 'La conversación no existe o fue eliminada.'
+    } else if (response.status === 500) {
+      errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
     } else if (errorData.error) {
       errorMessage = errorData.error
     }

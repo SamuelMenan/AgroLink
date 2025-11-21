@@ -8,12 +8,37 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 export default async function handler(req, res) {
+  const startTime = Date.now()
+  const requestId = Math.random().toString(36).substr(2, 9)
   const method = (req.method || 'GET').toUpperCase()
   
+  // Production logging
+  if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+    console.log(`[NOTIFICATIONS-${requestId}] Starting request:`, {
+      method: method,
+      url: req.url,
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date().toISOString()
+    })
+  }
+  
+  // Production CORS configuration
+  const origin = req.headers.origin
+  const allowedOrigins = [
+    'https://agro-link-jet.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:4173'
+  ]
+  
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+  const corsOrigin = isAllowedOrigin ? origin : allowedOrigins[0]
+  
   // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin)
   res.setHeader('Access-Control-Allow-Methods', 'GET,PATCH,POST,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*')
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
   
   if (method === 'OPTIONS') {
     res.status(204).end()
@@ -45,15 +70,29 @@ export default async function handler(req, res) {
                        `&order=created_at.desc&limit=${encodeURIComponent(limit)}`
 
       const authHeader = req.headers['authorization']
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.error('[notifications] Missing or invalid authorization header for GET request')
+        res.status(401).json({ 
+          error: 'No autenticado. Se requiere token de usuario.',
+          details: {
+            reason: 'Missing or invalid authorization header',
+            timestamp: new Date().toISOString(),
+            origin: origin
+          }
+        })
+        return
+      }
+      
       const headers = {
         'accept': 'application/json',
         'content-type': 'application/json',
         'apikey': supabaseAnon,
-        'Authorization': (typeof authHeader === 'string' && authHeader.length) ? authHeader : `Bearer ${supabaseAnon}`,
+        'Authorization': authHeader,
       }
 
       const controller = new AbortController()
-      const id = setTimeout(() => controller.abort(), 9000)
+      const timeout = parseInt(process.env.NOTIFICATIONS_TIMEOUT) || 9000
+      const id = setTimeout(() => controller.abort(), timeout)
       
       try {
         let resp
@@ -102,7 +141,15 @@ export default async function handler(req, res) {
 
       const authHeader = req.headers['authorization']
       if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Authorization requerido' })
+        console.error('[notifications] Missing or invalid authorization header for PATCH request')
+        res.status(401).json({ 
+          error: 'Authorization requerido',
+          details: {
+            reason: 'Missing or invalid authorization header',
+            timestamp: new Date().toISOString(),
+            origin: origin
+          }
+        })
         return
       }
 
@@ -118,7 +165,8 @@ export default async function handler(req, res) {
       }
 
       const controller = new AbortController()
-      const id = setTimeout(() => controller.abort(), 9000)
+      const timeout = parseInt(process.env.NOTIFICATIONS_TIMEOUT) || 9000
+      const id = setTimeout(() => controller.abort(), timeout)
       
       try {
         const resp = await fetch(endpoint, { 
@@ -142,8 +190,48 @@ export default async function handler(req, res) {
     } else {
       res.status(405).json({ error: 'Método no permitido' })
     }
+    
+    // Production logging for successful requests
+    if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+      const duration = Date.now() - startTime
+      console.log(`[NOTIFICATIONS-${requestId}] Request completed successfully:`, {
+        method: method,
+        status: 200,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      })
+    }
   } catch (error) {
     console.error('[notifications] Error:', error)
-    res.status(500).json({ error: 'Error interno del servidor', message: error.message })
+    
+    // Enhanced error handling for production
+    const errorResponse = {
+      error: 'Error interno del servidor',
+      message: error.message,
+      status: 500,
+      details: {
+        method: method,
+        userId: userId,
+        timestamp: new Date().toISOString(),
+        origin: origin
+      }
+    }
+    
+    // Log detailed error for debugging
+    console.error('[notifications] Production error details:', JSON.stringify(errorResponse, null, 2))
+    
+    // Production logging for errors
+    if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+      const duration = Date.now() - startTime
+      console.error(`[NOTIFICATIONS-${requestId}] Request failed:`, {
+        method: method,
+        status: 500,
+        duration: `${duration}ms`,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      })
+    }
+    
+    res.status(500).json(errorResponse)
   }
 }

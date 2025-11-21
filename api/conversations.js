@@ -16,9 +16,34 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPA
 //   POST /api/conversations?action=mark-read&id=CONV_ID (user_id) -> mark messages read
 //   GET  /api/conversations?action=participants&id=CONV_ID -> list participant user_ids
 export default async function handler(req, res) {
+  const startTime = Date.now()
+  const requestId = Math.random().toString(36).substr(2, 9)
+  
+  // Production logging
+  if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+    console.log(`[CONVERSATIONS-${requestId}] Starting request:`, {
+      method: req.method,
+      url: req.url,
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date().toISOString()
+    })
+  }
+  
+  // Production CORS configuration
+  const origin = req.headers.origin
+  const allowedOrigins = [
+    'https://agro-link-jet.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:4173'
+  ]
+  
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+  const corsOrigin = isAllowedOrigin ? origin : allowedOrigins[0]
+  
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin)
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
 
@@ -33,11 +58,27 @@ export default async function handler(req, res) {
   // Auth header (required for all except maybe public list, but RLS enforces anyway)
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No autenticado. Se requiere token de usuario.' })
+    console.error('[conversations] Missing or invalid authorization header')
+    return res.status(401).json({ 
+      error: 'No autenticado. Se requiere token de usuario.',
+      details: {
+        reason: 'Missing or invalid authorization header',
+        timestamp: new Date().toISOString(),
+        origin: origin
+      }
+    })
   }
   const userToken = authHeader.split(' ')[1]
-  if (userToken === SUPABASE_ANON_KEY) {
-    return res.status(401).json({ error: 'Se requiere token de usuario autenticado, no anon key' })
+  if (!userToken || userToken === SUPABASE_ANON_KEY) {
+    console.error('[conversations] Invalid token: using anon key or empty token')
+    return res.status(401).json({ 
+      error: 'Se requiere token de usuario autenticado, no anon key',
+      details: {
+        reason: 'Invalid authentication token',
+        timestamp: new Date().toISOString(),
+        origin: origin
+      }
+    })
   }
 
   const urlObj = new URL(req.url, 'http://localhost')
@@ -328,11 +369,53 @@ export default async function handler(req, res) {
     } else {
       return res.status(405).json({ error: 'Acción no soportada' })
     }
+    
+    // Production logging for successful requests
+    if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+      const duration = Date.now() - startTime
+      console.log(`[CONVERSATIONS-${requestId}] Request completed successfully:`, {
+        method: req.method,
+        action: action,
+        targetId: targetId,
+        status: res.statusCode,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      })
+    }
   } catch (error) {
     console.error('[conversations] Error:', error)
-    return res.status(500).json({ 
+    
+    // Enhanced error handling for production
+    const errorResponse = {
       error: 'Error interno del servidor',
-      message: error.message 
-    })
+      message: error.message,
+      status: 500,
+      details: {
+        method: req.method,
+        action: action,
+        targetId: targetId,
+        timestamp: new Date().toISOString(),
+        origin: origin
+      }
+    }
+    
+    // Log detailed error for debugging
+    console.error('[conversations] Production error details:', JSON.stringify(errorResponse, null, 2))
+    
+    // Production logging for errors
+    if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+      const duration = Date.now() - startTime
+      console.error(`[CONVERSATIONS-${requestId}] Request failed:`, {
+        method: req.method,
+        action: action,
+        targetId: targetId,
+        status: 500,
+        duration: `${duration}ms`,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      })
+    }
+    
+    return res.status(500).json(errorResponse)
   }
 }

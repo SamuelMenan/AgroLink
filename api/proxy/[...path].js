@@ -7,14 +7,46 @@ const HOP_BY_HOP = new Set([
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 export default async function handler(req, res) {
+  const startTime = Date.now()
+  const requestId = Math.random().toString(36).substr(2, 9)
+  
+  // Production logging
+  if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+    console.log(`[PROXY-${requestId}] Starting request:`, {
+      method: req.method,
+      url: req.url,
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date().toISOString()
+    })
+  }
+  
+  // Production CORS configuration
+  const origin = req.headers.origin
+  const allowedOrigins = [
+    'https://agro-link-jet.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:4173'
+  ]
+  
+  const isAllowedOrigin = allowedOrigins.includes(origin)
+  const corsOrigin = isAllowedOrigin ? origin : allowedOrigins[0]
+  
   if ((req.method || 'GET').toUpperCase() === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin)
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
     res.status(204).end()
     return
   }
-  const base = process.env.BACKEND_URL || 'https://agrolinkbackend.onrender.com'
+  
+  // Set CORS headers for actual requests
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin)
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
+  
+  // Fix environment variable name
+  const base = process.env.BACKEND_URL || process.env.VITE_BACKEND_URL || 'https://agrolinkbackend.onrender.com'
   const urlObj = new URL(req.url, 'http://localhost')
   const pathname = urlObj.pathname.replace(/^\/api\/proxy\/?/, '')
   const qs = urlObj.searchParams.toString()
@@ -81,7 +113,25 @@ export default async function handler(req, res) {
         continue 
       }
       console.error('[proxy] fetch error after retries', e && e.message)
-      res.status(502).json({ ok: false, error: (e && e.message) || 'proxy fetch failed' })
+      
+      // Enhanced error handling for production
+      const errorResponse = {
+        ok: false,
+        error: (e && e.message) || 'proxy fetch failed',
+        status: 502,
+        details: {
+          url: url,
+          method: method,
+          attempts: attempt,
+          timestamp: new Date().toISOString(),
+          origin: origin
+        }
+      }
+      
+      // Log detailed error for debugging
+      console.error('[proxy] Production error details:', JSON.stringify(errorResponse, null, 2))
+      
+      res.status(502).json(errorResponse)
       return
     }
   }
@@ -94,5 +144,18 @@ export default async function handler(req, res) {
     }
   })
   const buf = Buffer.from(await resp.arrayBuffer())
+  
+  // Production logging for request completion
+  if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+    const duration = Date.now() - startTime
+    console.log(`[PROXY-${requestId}] Request completed:`, {
+      status: resp.status,
+      statusText: resp.statusText,
+      duration: `${duration}ms`,
+      contentLength: buf.length,
+      timestamp: new Date().toISOString()
+    })
+  }
+  
   res.end(buf)
 }
