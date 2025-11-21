@@ -157,7 +157,17 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   }
 
   const directUrl = `${BASE_URL}${path}`
-  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
+  
+  // En desarrollo con Vite, si el path ya empieza con /api, usarlo directamente
+  // ya que Vite ya tiene configurado un proxy para /api
+  const isDevWithViteProxy = !import.meta.env.PROD && BASE_URL === 'http://localhost:8080'
+  const shouldUseDirectPath = isDevWithViteProxy && path.startsWith('/api')
+  
+  const proxiedPath = shouldUseDirectPath 
+    ? path 
+    : path.startsWith('/api/proxy') 
+      ? path 
+      : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
   const proxyUrl = proxiedPath
 
   // Enhanced logging for production debugging
