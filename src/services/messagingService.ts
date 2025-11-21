@@ -371,11 +371,11 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
   console.log('[getConversations] Obteniendo conversaciones para usuario:', userId)
 
   try {
-    return await apiClient.get<Conversation[]>(`/api/v1/conversations?user_id=${userId}`)
+    return await apiClient.get<Conversation[]>(`/api/conversations?user_id=${userId}`)
   } catch {
     // Fallback a fetch directo para mantener el manejo de errores detallado actual
   }
-  const response = await fetch(`${API_BASE}/conversations?user_id=${userId}`, {
+  const response = await fetch(`/api/conversations?user_id=${userId}`, {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -426,7 +426,7 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 
   // Use apiClient for GET with retries/timeouts
   try {
-    const data = await apiClient.get<Message[]>(`/api/v1/conversations?action=messages&id=${conversationId}`)
+    const data = await apiClient.get<Message[]>(`/api/conversations?action=messages&id=${conversationId}`)
     // Ensure we always return an array
     return Array.isArray(data) ? data : []
   } catch (e) {

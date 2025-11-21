@@ -157,7 +157,12 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   }
 
   const directUrl = `${BASE_URL}${path}`
-  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
+  const shouldProxy = path.startsWith('/api/v1') || path.startsWith('/api/proxy')
+  const proxiedPath = path.startsWith('/api/proxy')
+    ? path
+    : (shouldProxy
+        ? (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
+        : path)
   const proxyUrl = proxiedPath
 
   // Enhanced logging for production debugging
@@ -184,7 +189,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Primary attempt: proxy same-origin
+      // Primary attempt: use proxy for versioned backend endpoints; otherwise same-origin
       const primary = proxyUrl
       lastUrlTried = primary
       
@@ -192,7 +197,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       const isProductOp = path.includes('/api/v1/products')
       const timeout = isProductOp ? 15000 : 8000
       
-      console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary, `timeout: ${timeout}ms`)
+      console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via ${shouldProxy ? 'proxy' : 'same-origin'}:`, primary, `timeout: ${timeout}ms`)
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, timeout)
       
       // If proxy fails with 405/502/503/504, immediately try direct fetch (if endpoint supports CORS)
