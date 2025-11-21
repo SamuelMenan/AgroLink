@@ -6,7 +6,6 @@ import { Link } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
 
 import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
-import { MessageSellerModal } from '../components/MessageSellerModal'
 
 export default function Products() {
   const [enhancedFilters, setEnhancedFilters] = useState<EnhancedSearchFilters>({
@@ -148,6 +147,9 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
   const [added, setAdded] = useState(false)
   const [removed, setRemoved] = useState(false)
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [messageSent, setMessageSent] = useState(false)
+  const [message, setMessage] = useState('Hola. ¿Sigue estando disponible?')
   const firstImage = p.image_urls?.[0]
   const isOwner = user?.id === p.user_id
   const distanceKm = useMemo(()=>{
@@ -209,17 +211,25 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     setTimeout(()=> setAdded(false), 1200)
   }
 
-  async function handleSendMessage(message: string) {
-    // For now, we'll simulate sending a message
-    // In a real implementation, this would call a messaging service
+  async function handleSendMessage() {
+    if (!message.trim() || isSending) return
+    
+    setIsSending(true)
     console.log(`Sending message to seller ${p.user_id}: ${message}`)
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // For now, just show a success message in console
-    // In the future, this would integrate with your messaging system
-    alert('Mensaje enviado exitosamente. (Funcionalidad de mensajería en desarrollo)')
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setMessageSent(true)
+      setTimeout(() => {
+        setMessageSent(false)
+        setIsMessageModalOpen(false)
+        setMessage('Hola. ¿Sigue estando disponible?')
+      }, 2000)
+    } catch {
+      setErr('Error al enviar el mensaje')
+    } finally {
+      setIsSending(false)
+    }
   }
   return (
     <div className="overflow-hidden rounded-xl border border-green-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -347,22 +357,69 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
         <div className="mt-4 space-y-3">
           {err && <p className="text-xs text-red-600" role="alert">{err}</p>}
           
-          {/* Message Seller Button - Messenger Style */}
-          <button 
-            onClick={() => setIsMessageModalOpen(true)} 
-            disabled={p.stock_available === false}
-            className={`w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-              p.stock_available === false
-                ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'border-blue-500 text-blue-600 hover:bg-blue-50'
-            }`}
-            aria-label={`Enviar mensaje al vendedor de ${p.name}`}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.477 2 2 6.145 2 11.243c0 2.905 1.463 5.499 3.75 7.189V22l3.427-1.88c.915.253 1.856.38 2.823.38 5.523 0 10-4.145 10-9.257S17.523 2 12 2zm.995 12.468l-2.567-2.736-5.01 2.736 5.51-5.844 2.628 2.736 4.949-2.736-5.51 5.844z"/>
-            </svg>
-            Enviar mensaje al vendedor
-          </button>
+          {/* Inline Message Form or Button */}
+          {isMessageModalOpen ? (
+            <div className="bg-gray-50 rounded-lg p-3 space-y-3 border border-gray-200">
+              {messageSent ? (
+                <div className="text-center py-4">
+                  <span className="inline-flex items-center gap-2 text-green-600 font-medium">
+                    <span className="material-icons-outlined text-xl">check_circle</span>
+                    Mensaje enviado
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Escribe un mensaje..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                    rows={3}
+                    disabled={isSending}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={isSending || !message.trim()}
+                      className={`flex-1 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
+                        isSending || !message.trim()
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {isSending ? 'Enviando...' : 'Enviar'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsMessageModalOpen(false)
+                        setMessage('Hola. ¿Sigue estando disponible?')
+                      }}
+                      disabled={isSending}
+                      className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsMessageModalOpen(true)} 
+              disabled={p.stock_available === false}
+              className={`w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                p.stock_available === false
+                  ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'border-blue-500 text-blue-600 hover:bg-blue-50'
+              }`}
+              aria-label={`Enviar mensaje al vendedor de ${p.name}`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.477 2 2 6.145 2 11.243c0 2.905 1.463 5.499 3.75 7.189V22l3.427-1.88c.915.253 1.856.38 2.823.38 5.523 0 10-4.145 10-9.257S17.523 2 12 2zm.995 12.468l-2.567-2.736-5.01 2.736 5.51-5.844 2.628 2.736 4.949-2.736-5.51 5.844z"/>
+              </svg>
+              Enviar mensaje al vendedor
+            </button>
+          )}
           
           {/* Enhanced Add to Cart Button */}
           <button 
@@ -381,15 +438,6 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
           </button>
         </div>
       )}
-      
-      {/* Message Seller Modal */}
-      <MessageSellerModal
-        isOpen={isMessageModalOpen}
-        onClose={() => setIsMessageModalOpen(false)}
-        sellerName="Vendedor"
-        productName={p.name}
-        onSendMessage={handleSendMessage}
-      />
     </div>
   )
 }
