@@ -6,6 +6,9 @@ import { Send, Search, Archive, UserPlus, ChevronLeft, MoreVertical } from 'luci
 
 export default function Messaging() {
   const [searchParams] = useSearchParams();
+  
+  console.log('[Messaging] Component rendering, searchParams:', searchParams.toString());
+  
   const { 
     state, 
     sendMessage, 

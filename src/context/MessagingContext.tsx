@@ -159,6 +159,7 @@ export function messagingReducer(state: MessagingState, action: MessagingAction)
 }
 
 export function MessagingProvider({ children }: { children: React.ReactNode }) {
+  console.log('[MessagingProvider] Initializing provider');
   const [state, dispatch] = useReducer(messagingReducer, initialState);
 
   // Handle real-time events
@@ -387,6 +388,9 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
 export function useMessaging() {
   const context = useContext(MessagingContext);
   if (context === undefined) {
+    console.error('[MessagingContext] useMessaging called outside of MessagingProvider');
+    console.error('[MessagingContext] Current location:', window.location.href);
+    console.error('[MessagingContext] Stack trace:', new Error().stack);
     throw new Error('useMessaging must be used within a MessagingProvider');
   }
   return context;

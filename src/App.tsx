@@ -15,7 +15,7 @@ import MyProducts from './pages/products/MyProducts'
 import EditProduct from './pages/products/EditProduct'
 // RealtimeNotifications eliminado en migración a backend-only.
 import NotificationsPage from './pages/notifications/NotificationsPage'
-import Messages from './pages/messages/Messaging'
+import MessagingWrapper from './pages/messages/MessagingWrapper'
 import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'
@@ -40,7 +40,7 @@ function App() {
           <Route path="/dashboard/products/new" element={<PublishProduct />} />
           <Route path="/dashboard/products/:id/edit" element={<EditProduct />} />
           <Route path="/dashboard/notifications" element={<NotificationsPage />} />
-          <Route path="/messages" element={<Messages />} />
+          <Route path="/messages" element={<MessagingWrapper />} />
           <Route path="/dashboard/orders" element={<OrdersDashboard />} />
           <Route path="/dashboard/settings" element={<AccountPrivacy />} />
           <Route path="/dashboard/catalog" element={<CatalogManagement />} />
