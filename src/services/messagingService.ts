@@ -46,13 +46,33 @@ export async function createConversation(
   // Handle new interface
   if (typeof buyerIdOrParams === 'object') {
     const { participantId, productId, initialMessage } = buyerIdOrParams
-    const currentUserId = localStorage.getItem('userId') || ''
+    
+    // Get current user ID from token
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('No autenticado')
+    }
+    
+    // Decode JWT to get user ID
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const currentUserId = payload.sub || payload.user_id || payload.id
+    
+    if (!currentUserId) {
+      throw new Error('No se pudo obtener el ID del usuario')
+    }
+    
+    console.log('[createConversation] Datos a enviar:', {
+      buyer_id: currentUserId,
+      seller_id: participantId,
+      product_id: productId,
+      initial_message: initialMessage
+    })
     
     const response = await fetch(`${API_BASE}/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         buyer_id: currentUserId,
@@ -63,7 +83,9 @@ export async function createConversation(
     })
 
     if (!response.ok) {
-      throw new Error('Error al crear la conversación')
+      const errorData = await response.json().catch(() => ({}))
+      console.error('[createConversation] Error response:', errorData)
+      throw new Error(errorData.error || 'Error al crear la conversación')
     }
 
     return response.json()

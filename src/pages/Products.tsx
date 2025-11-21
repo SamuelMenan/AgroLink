@@ -219,19 +219,21 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     setErr(null)
     
     try {
+      console.log('Enviando mensaje:', {
+        buyerId: user.id,
+        sellerId: p.user_id,
+        productId: p.id,
+        message: message
+      })
+      
       // Crear conversación y enviar mensaje
-      await createConversation({
+      const result = await createConversation({
         participantId: p.user_id,
         productId: p.id,
         initialMessage: message
       })
       
-      console.log('Mensaje enviado:', {
-        from: user.id,
-        to: p.user_id,
-        productId: p.id,
-        message: message
-      })
+      console.log('Conversación creada:', result)
       
       // Show success message
       setMessageSent(true)
