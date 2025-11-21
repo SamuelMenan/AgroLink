@@ -36,8 +36,8 @@ export const VALIDATION_RULES = {
     message: 'Solo se permiten números y puntos decimales'
   },
   quantity: {
-    pattern: /^\d+$/,
-    message: 'Solo se permiten números'
+    pattern: /^[A-Za-zÁáÉéÍíÓóÚúÑñÜü0-9\s\-,.]+$/,
+    message: 'Solo se permiten letras, números, espacios y puntos'
   },
   searchQuery: {
     pattern: /^[A-Za-zÁáÉéÍíÓóÚúÑñÜü0-9\s\-]+$/,
@@ -56,15 +56,9 @@ export function validateInput(value: string, rule: ValidationRule): ValidationRe
     return { isValid: false, error: 'Este campo es obligatorio' }
   }
   
-  // Trim whitespace and validate
-  const trimmedValue = value.trim()
-  if (!rule.pattern.test(trimmedValue)) {
+  // Validate pattern
+  if (!rule.pattern.test(value)) {
     return { isValid: false, error: rule.message }
-  }
-  
-  // Check for leading/trailing spaces
-  if (value !== trimmedValue) {
-    return { isValid: false, error: 'No se permiten espacios al inicio o final' }
   }
   
   return { isValid: true }
