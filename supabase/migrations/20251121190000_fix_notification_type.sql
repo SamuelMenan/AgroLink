@@ -1,5 +1,5 @@
--- Migration: fix notification trigger to use allowed type and proper columns
--- Drops old trigger/function and recreates with type = 'message'
+-- Migration: asegurar que el tipo de notificación 'message' sea válido y
+-- corregir el trigger de mensajes para insertar notificaciones coherentes.
 
 -- Safety: drop existing trigger names if they differ
 DROP TRIGGER IF EXISTS trg_messages_notify ON public.messages;
@@ -9,23 +9,33 @@ DROP TRIGGER IF EXISTS notify_on_message ON public.messages;
 DROP FUNCTION IF EXISTS public.notify_new_message();
 DROP FUNCTION IF EXISTS public.notify_message();
 
--- Recreate notification function aligned with current notifications schema
--- Current notifications columns: (id, user_id, type, title, body, url, severity, read_at, created_at)
--- We keep severity as 'info' or switch to 'message' if 'info' is invalid. Using 'message' for consistency.
+-- Eliminar constraint si existe y recrearlo con los tipos usados por la app
+ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_type_check
+  CHECK (type IN (
+    'message',
+    'system',
+    'request_new',
+    'request_update',
+    'order_update'
+  ));
+
+-- Función de notificación coherente con el esquema actual
 CREATE OR REPLACE FUNCTION public.notify_message()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.notifications (user_id, type, title, body, url, severity)
   SELECT
     cp.user_id,
-    'message',                 -- allowed type
+    'message',
     'Nuevo mensaje',
-    NEW.content,               -- body stores content (plaintext)
+    NEW.content,
     '/messages/' || NEW.conversation_id,
-    'message'                  -- severity adjusted from 'info' to 'message'
+    'info'
   FROM public.conversation_participants cp
   WHERE cp.conversation_id = NEW.conversation_id
-    AND cp.user_id <> NEW.sender_id;  -- do not notify sender
+    AND cp.user_id <> NEW.sender_id;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -351,6 +351,11 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
 
   const renderMessage = (message: Message) => {
     const isFromCurrentUser = message.sender_id === user?.id
+    const otherName = !isFromCurrentUser
+      ? (message.sender_name
+        || (message.sender_id === selectedConversation?.buyer_id ? selectedConversation?.buyer_name : selectedConversation?.seller_name)
+        || 'Usuario')
+      : 'Tú'
     
     return (
       <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'} mb-3`}>
@@ -359,6 +364,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
             ? 'bg-blue-500 text-white' 
             : 'bg-gray-200 text-gray-800'
         }`}>
+          <p className="text-[11px] font-semibold opacity-70 mb-0.5">{otherName}</p>
           <p className="text-sm">{message.content}</p>
           <p className="text-xs mt-1 opacity-70">
             {new Date(message.created_at).toLocaleTimeString()}
