@@ -178,7 +178,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   // In PROD, when origins differ, force proxy-only to avoid CORS/gateway noise
 
-  const maxRetries = 4
+  const maxRetries = 2
   let lastError: unknown = null
   let lastUrlTried = directUrl
 
@@ -188,9 +188,9 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       const primary = proxyUrl
       lastUrlTried = primary
       
-      // Increase timeout for product operations (reduced from 30s to 8s for better UX)
+      // Reduce timeout for better UX
       const isProductOp = path.includes('/api/v1/products')
-      const timeout = isProductOp ? 20000 : 12000
+      const timeout = isProductOp ? 10000 : 8000
       
       console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via proxy:`, primary, `timeout: ${timeout}ms`)
       let res = await fetchWithTimeout(fetchImpl, primary, { ...init, headers }, timeout)

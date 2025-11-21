@@ -154,14 +154,14 @@ export async function listPublicProducts(filters: SearchFilters = {}): Promise<P
   if (category) parts.push(`category=eq.${encodeURIComponent(category)}`)
   const orSegments: string[] = []
   if (q && q.trim()) {
-    const like = `%${q.trim()}%`
-    orSegments.push(`name.ilike.${like}`, `description.ilike.${like}`)
+    const searchTerm = encodeURIComponent(q.trim())
+    orSegments.push(`name.ilike.*${searchTerm}*`, `description.ilike.*${searchTerm}*`)
   }
   if (locationText && locationText.trim()) {
-    const likeLoc = `%${locationText.trim()}%`
-    orSegments.push(`location.ilike.${likeLoc}`)
+    const locTerm = encodeURIComponent(locationText.trim())
+    orSegments.push(`location.ilike.*${locTerm}*`)
   }
-  if (orSegments.length) parts.push(`or=${orSegments.join(',')}`)
+  if (orSegments.length) parts.push(`or=(${orSegments.join(',')})`)
   // order by created_at desc for relevance default
   parts.push('order=created_at.desc')
   const query = parts.join('&')

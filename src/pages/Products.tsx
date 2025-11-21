@@ -33,21 +33,7 @@ export default function Products() {
     distanceKm: enhancedFilters.distanceKm, 
     sort: enhancedFilters.sort 
   }), [enhancedFilters])
-  const debounced = useDebouncedValue(filtersRaw, 350)
-
-  useEffect(()=>{
-    ;(async ()=>{
-      try {
-        // Enhanced pre-warming with multiple endpoints
-        await Promise.all([
-          fetch('/api/proxy/actuator/health', { cache: 'no-store' }).catch(() => {}),
-          fetch('/api/warm', { cache: 'no-store' }).catch(() => {})
-        ])
-      } catch {
-        // Silently ignore warmup errors
-      }
-    })()
-  }, [])
+  const debounced = useDebouncedValue(filtersRaw, 200)
 
   // Monitor offline status and queue size
   useEffect(() => {
