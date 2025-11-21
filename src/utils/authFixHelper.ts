@@ -1,11 +1,32 @@
 /**
  * Authentication Fix Helper for AgroLink
  * This script helps fix the anonymous token issue
+ * Works with existing apiAuth service
  */
 
+import { getAccessToken, getRefreshToken, clearTokens } from '../services/apiAuth'
+
+interface AuthStatus {
+  isValid: boolean
+  error?: string
+  userId?: string
+  role?: string
+  details?: any
+}
+
+interface FixResult {
+  success: boolean
+  userId?: string
+  token?: string
+  alreadyFixed?: boolean
+  needsReAuth?: boolean
+  message?: string
+  error?: string
+}
+
 // Step 1: Check current authentication status
-export function checkAuthStatus() {
-  const token = localStorage.getItem('agrolink_access_token')
+export function checkAuthStatus(): AuthStatus {
+  const token = getAccessToken()
   
   if (!token) {
     console.log('❌ No token found in localStorage')
@@ -50,118 +71,86 @@ export function checkAuthStatus() {
     return {
       isValid: true,
       userId: payload.sub || payload.user_id || payload.id,
-      role: payload.role,
-      payload
+      role: payload.role
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Token decode error:', error)
     return { isValid: false, error: error.message }
   }
 }
 
 // Step 2: Fix authentication by getting proper user token
-export async function fixAuthentication(supabase) {
+export async function fixAuthentication(): Promise<FixResult> {
   console.log('🔄 Attempting to fix authentication...')
   
   try {
-    // Check current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    // For this debug version, we'll use a simplified approach
+    // Check if we have a refresh token
+    const refreshToken = getRefreshToken()
     
-    if (sessionError) {
-      console.error('❌ Session error:', sessionError)
-      return { success: false, error: sessionError.message }
+    if (!refreshToken) {
+      console.log('❌ No refresh token found')
+      return { success: false, error: 'No refresh token' }
     }
     
-    if (!session) {
-      console.log('❌ No active session found')
-      return { success: false, error: 'No active session' }
-    }
+    console.log('✅ Found refresh token, attempting to get new access token')
     
-    console.log('✅ Found session:', {
-      hasAccessToken: !!session.access_token,
-      userId: session.user?.id,
-      userEmail: session.user?.email
-    })
+    // Try to refresh the session (this would normally call refreshSession from apiAuth)
+    // For now, we'll just indicate that re-authentication is needed
+    return { success: false, error: 'Please sign in again to refresh your authentication' }
     
-    // Validate the session token
-    if (session.access_token) {
-      const tokenValidation = validateToken(session.access_token)
-      
-      if (tokenValidation.isValid && tokenValidation.role === 'authenticated') {
-        // Store the correct token
-        localStorage.setItem('agrolink_access_token', session.access_token)
-        console.log('✅ Stored valid user token')
-        
-        return {
-          success: true,
-          userId: tokenValidation.userId,
-          token: session.access_token
-        }
-      } else {
-        console.log('❌ Session token is invalid or anonymous')
-      }
-    }
-    
-    return { success: false, error: 'Session token is not valid for messaging' }
-    
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Authentication fix failed:', error)
     return { success: false, error: error.message }
   }
 }
 
-// Step 3: Validate token
-function validateToken(token) {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) {
-      return { isValid: false, error: 'Invalid JWT format' }
-    }
-    
-    const payloadStr = parts[1]
-    const paddedPayload = payloadStr + '='.repeat((4 - payloadStr.length % 4) % 4)
-    const payload = JSON.parse(atob(paddedPayload))
-    
-    return {
-      isValid: true,
-      role: payload.role,
-      userId: payload.sub || payload.user_id || payload.id,
-      payload
-    }
-    
-  } catch (error) {
-    return { isValid: false, error: error.message }
-  }
-}
+// Step 3: Validate token (currently unused but kept for reference)
+// function validateToken(token: string): TokenValidation {
+//   try {
+//     const parts = token.split('.')
+//     if (parts.length !== 3) {
+//       return { isValid: false, error: 'Invalid JWT format' }
+//     }
+//     
+//     const payloadStr = parts[1]
+//     const paddedPayload = payloadStr + '='.repeat((4 - payloadStr.length % 4) % 4)
+//     const payload = JSON.parse(atob(paddedPayload))
+//     
+//     return {
+//       isValid: true,
+//       role: payload.role,
+//       userId: payload.sub || payload.user_id || payload.id,
+//       payload
+//     }
+//     
+//   } catch (error: any) {
+//     return { isValid: false, error: error.message }
+//   }
+// }
 
 // Step 4: Force re-authentication if needed
-export async function forceReAuthentication(supabase) {
+export async function forceReAuthentication(): Promise<FixResult> {
   console.log('🔄 Forcing re-authentication...')
   
   try {
-    // Clear current token
-    localStorage.removeItem('agrolink_access_token')
-    
-    // Sign out current user
-    const { error: signOutError } = await supabase.auth.signOut()
-    if (signOutError) {
-      console.error('❌ Sign out error:', signOutError)
-    }
+    // Clear current tokens
+    clearTokens()
     
     console.log('✅ Cleared authentication state')
     console.log('📝 Please sign in again to get proper authentication')
     
     return { success: true, message: 'Please sign in again' }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Force re-authentication failed:', error)
     return { success: false, error: error.message }
   }
 }
 
 // Step 5: Complete authentication fix flow
-export async function completeAuthFix(supabase) {
+export async function completeAuthFix(): Promise<FixResult> {
   console.log('🚀 Starting complete authentication fix...')
   
   // Step 1: Check current status
@@ -174,14 +163,14 @@ export async function completeAuthFix(supabase) {
   }
   
   // Step 2: Try to fix with existing session
-  const fixResult = await fixAuthentication(supabase)
+  const fixResult = await fixAuthentication()
   if (fixResult.success) {
     return fixResult
   }
   
   // Step 3: Force re-authentication if needed
   console.log('🔄 Existing session fix failed, forcing re-authentication...')
-  const forceResult = await forceReAuthentication(supabase)
+  await forceReAuthentication()
   
   return {
     success: true,

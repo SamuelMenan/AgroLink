@@ -1,16 +1,30 @@
-import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-co'
-import { checkAuthStatus, completeAuthFix } from '../utils/authFixHelper'
+import { useState, useEffect } from 'react'
+import { clearTokens } from '../services/apiAuth'
+import { checkAuthStatus } from '../utils/authFixHelper'
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+interface AuthStatus {
+  isValid: boolean
+  error?: string
+  userId?: string
+  role?: string
+  details?: any
+}
+
+interface FixResult {
+  success: boolean
+  userId?: string
+  alreadyFixed?: boolean
+  needsReAuth?: boolean
+  message?: string
+  error?: string
+}
+
+// Simple auth service for debugging - no Supabase client needed
 
 export default function AuthDebugPage() {
-  const [authStatus, setAuthStatus] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [fixResult, setFixResult] = useState(null)
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [fixResult, setFixResult] = useState<FixResult | null>(null)
 
   useEffect(() => {
     checkCurrentAuth()
@@ -25,7 +39,17 @@ export default function AuthDebugPage() {
 
   const handleFixAuth = async () => {
     setIsLoading(true)
-    const result = await completeAuthFix(supabase)
+    
+    // For debugging, we'll use a simplified approach
+    const result: FixResult = {
+      success: true,
+      message: 'Authentication debug - clearing tokens and requiring re-login',
+      needsReAuth: true
+    }
+    
+    // Clear current tokens to force re-authentication
+    clearTokens()
+    
     setFixResult(result)
     
     // Recheck status after fix
@@ -40,7 +64,7 @@ export default function AuthDebugPage() {
     try {
       const status = checkAuthStatus()
       if (!status.isValid) {
-        alert('Authentication issue: ' + status.error)
+        alert('Authentication issue: ' + (status.error || 'Unknown error'))
         return
       }
 
@@ -67,9 +91,9 @@ export default function AuthDebugPage() {
       } else {
         alert('❌ Error: ' + (result.error || 'Unknown error'))
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Test error:', error)
-      alert('❌ Test failed: ' + error.message)
+      alert('❌ Test failed: ' + (error.message || 'Unknown error'))
     } finally {
       setIsLoading(false)
     }
@@ -170,7 +194,8 @@ export default function AuthDebugPage() {
               />
               <button
                 onClick={() => {
-                  const token = document.getElementById('manualToken').value
+                  const tokenElement = document.getElementById('manualToken') as HTMLTextAreaElement
+                  const token = tokenElement?.value
                   if (token) {
                     localStorage.setItem('agrolink_access_token', token)
                     checkCurrentAuth()
