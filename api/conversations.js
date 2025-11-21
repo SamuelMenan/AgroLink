@@ -81,6 +81,32 @@ export default async function handler(req, res) {
     })
   }
 
+  // Decode JWT to derive authenticated user id (for RLS alignment)
+  let authUserId = null
+  try {
+    const payloadStr = userToken.split('.')[1]
+    if (payloadStr) {
+      const payload = JSON.parse(Buffer.from(payloadStr, 'base64').toString('utf8'))
+      authUserId = payload.sub || payload.user_id || payload.id || null
+    }
+  } catch (e) {
+    console.warn('[conversations] Unable to decode JWT payload:', e.message)
+  }
+
+  // Generic JSON body parsing (Vercel may not populate req.body consistently)
+  let parsedBody = null
+  if (req.method === 'POST' && (req.headers['content-type'] || '').includes('application/json')) {
+    try {
+      const chunks = []
+      for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      const raw = Buffer.concat(chunks).toString('utf8')
+      parsedBody = raw ? JSON.parse(raw) : {}
+    } catch (e) {
+      console.error('[conversations] Failed to parse JSON body:', e.message)
+      return res.status(400).json({ error: 'Body JSON inválido', details: e.message })
+    }
+  }
+
   const urlObj = new URL(req.url, 'http://localhost')
   const action = urlObj.searchParams.get('action') || null
   const targetId = urlObj.searchParams.get('id') || null
@@ -89,7 +115,7 @@ export default async function handler(req, res) {
     // ================= MAIN COLLECTION (no action) =================
     if (!action && req.method === 'POST') {
       // Crear nueva conversación
-      const { buyer_id, seller_id, product_id, initial_message } = req.body
+      const { buyer_id, seller_id, product_id, initial_message } = parsedBody || req.body || {}
 
       console.log('[conversations] POST request:', {
         buyer_id,
@@ -102,6 +128,15 @@ export default async function handler(req, res) {
 
       if (!buyer_id || !seller_id || !product_id) {
         return res.status(400).json({ error: 'Faltan campos requeridos: buyer_id, seller_id, product_id' })
+      }
+
+      // Ensure buyer_id matches auth user id (RLS: auth.uid())
+      if (authUserId && authUserId !== buyer_id) {
+        console.warn('[conversations] buyer_id does not match authenticated user id', { authUserId, buyer_id })
+        return res.status(403).json({
+          error: 'buyer_id no coincide con el usuario autenticado',
+          details: { authUserId, buyer_id }
+        })
       }
 
       // Verificar si ya existe una conversación entre estos usuarios para este producto
@@ -205,21 +240,32 @@ export default async function handler(req, res) {
         return res.status(partBuyerRes.status).json({ error: 'No se pudo agregar participante comprador', details: t })
       }
 
-      // Luego inserta al vendedor (permitido porque ya eres participante)
-      const partSellerRes = await fetch(participantsUrl, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${userToken}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=ignore-duplicates,return=minimal'
-        },
-        body: JSON.stringify({ conversation_id: conversation.id, user_id: seller_id })
-      })
-      if (!partSellerRes.ok && partSellerRes.status !== 409) {
-        const t = await partSellerRes.text()
-        console.error('[conversations] Error adding seller participant:', partSellerRes.status, t)
-        return res.status(partSellerRes.status).json({ error: 'No se pudo agregar participante vendedor', details: t })
+      // Attempt seller insertion; if forbidden (RLS), mark pending
+      let sellerPending = false
+      try {
+        const partSellerRes = await fetch(participantsUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=ignore-duplicates,return=minimal'
+          },
+          body: JSON.stringify({ conversation_id: conversation.id, user_id: seller_id })
+        })
+        if (!partSellerRes.ok && partSellerRes.status !== 409) {
+          const t = await partSellerRes.text()
+            if (partSellerRes.status === 403) {
+              console.warn('[conversations] Seller participant insertion blocked by RLS; marking pending.')
+              sellerPending = true
+            } else {
+              console.error('[conversations] Error adding seller participant:', partSellerRes.status, t)
+              return res.status(partSellerRes.status).json({ error: 'No se pudo agregar participante vendedor', details: t })
+            }
+        }
+      } catch (e) {
+        console.warn('[conversations] Seller insertion exception, marking pending:', e.message)
+        sellerPending = true
       }
 
       // Enviar mensaje inicial si existe
@@ -242,7 +288,7 @@ export default async function handler(req, res) {
         })
       }
 
-      return res.status(201).json(conversation)
+      return res.status(201).json({ ...conversation, seller_pending: sellerPending })
 
     } else if (!action && req.method === 'GET') {
       // Obtener conversaciones del usuario
@@ -366,6 +412,29 @@ export default async function handler(req, res) {
       const messagesUrl = `${SUPABASE_URL}/rest/v1/message_receipts` // expects upsert individually per message in real scenario
       // For simplicity, we just acknowledge success (detailed receipts can be added later)
       return res.status(200).json({ ok: true })
+    } else if (action === 'add-participant') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido (add-participant)' })
+      if (!targetId) return res.status(400).json({ error: 'id requerido' })
+      const { user_id } = parsedBody || req.body || {}
+      if (!user_id) return res.status(400).json({ error: 'user_id requerido' })
+      if (authUserId && authUserId !== user_id) {
+        return res.status(403).json({ error: 'user_id no coincide con usuario autenticado' })
+      }
+      const participantsUrl = `${SUPABASE_URL}/rest/v1/conversation_participants`
+      const insResp = await fetch(participantsUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=ignore-duplicates,return=minimal'
+        },
+        body: JSON.stringify({ conversation_id: targetId, user_id })
+      })
+      if (!insResp.ok && insResp.status !== 409) {
+        return res.status(insResp.status).json({ error: 'No se pudo agregar participante', details: await insResp.text() })
+      }
+      return res.status(201).json({ ok: true })
     } else {
       return res.status(405).json({ error: 'Acción no soportada' })
     }

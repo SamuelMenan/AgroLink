@@ -65,6 +65,8 @@ export interface Conversation {
   unread_count: number
   created_at: string
   updated_at: string
+  // Indicates seller participant insertion pending (RLS prevented auto insert)
+  seller_pending?: boolean
 }
 
 export interface Peticion {

@@ -66,7 +66,7 @@ export async function createConversation(
       buyer_id: currentUserId,
       seller_id: participantId,
       product_id: productId,
-      initial_message: initialMessage
+      initial_message: initialMessage || null
     })
     
     const response = await fetch(`${API_BASE}/conversations`, {
@@ -79,7 +79,8 @@ export async function createConversation(
         buyer_id: currentUserId,
         seller_id: participantId,
         product_id: productId,
-        initial_message: initialMessage || 'Hola. ¿Sigue estando disponible?'
+        // Only send initial_message if provided (avoid default duplications)
+        ...(initialMessage ? { initial_message: initialMessage } : {})
       })
     })
 
@@ -101,7 +102,7 @@ export async function createConversation(
           buyer_id: currentUserId,
           seller_id: participantId,
           product_id: productId,
-          initial_message: initialMessage || 'Hola. ¿Sigue estando disponible?'
+          initial_message: initialMessage || null
         },
         tokenLength: token.length,
         tokenPreview: token.substring(0, 20) + '...',
