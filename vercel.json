@@ -7,6 +7,9 @@
     "api/products-delete.js": {
       "maxDuration": 30
     },
+    "api/products-update.js": {
+      "maxDuration": 30
+    },
     "api/refresh.js": {
       "maxDuration": 30
     }
@@ -19,6 +22,7 @@
     { "source": "/api/proxy/api/v1/products", "destination": "/api/products" },
     { "source": "/api/proxy/api/v1/products/(.*)", "destination": "/api/products/$1" },
     { "source": "/api/proxy/api/v1/products-delete", "destination": "/api/products-delete" },
+    { "source": "/api/proxy/api/v1/products-update", "destination": "/api/products-update" },
     { "source": "/api/proxy/api/v1/auth/refresh", "destination": "/api/refresh" },
     { "source": "/api/proxy/api/v1/messages", "destination": "https://agrolinkbackend.onrender.com/api/v1/messages" },
     { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" },

@@ -78,7 +78,11 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id' | 'user_id' | 'created_at'>>): Promise<Product> {
-  const res = await apiFetch(`/api/v1/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  const res = await apiFetch(`/api/v1/products-update`, { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify({ id, patch }) 
+  })
   if (!res.ok) throw new Error('Error actualizando producto')
   const data = await res.json()
   return Array.isArray(data) ? (data[0] as Product) : (data as Product)
