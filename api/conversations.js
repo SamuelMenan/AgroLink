@@ -58,19 +58,50 @@ export default async function handler(req, res) {
 
   // Auth header (required for all except maybe public list, but RLS enforces anyway)
   const authHeader = req.headers.authorization
+  // Support guest-based creation: allow POST with guest_id in body without auth header
+  let isGuestFlow = false
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.error('[conversations] Missing or invalid authorization header')
-    return res.status(401).json({ 
-      error: 'No autenticado. Se requiere token de usuario.',
-      details: {
-        reason: 'Missing or invalid authorization header',
-        timestamp: new Date().toISOString(),
-        origin: origin
+    if (req.method === 'POST') {
+      // Attempt to parse body to detect guest_id
+      let rawBody = null
+      if ((req.headers['content-type'] || '').includes('application/json')) {
+        try {
+          const chunks = []
+          for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+          rawBody = Buffer.concat(chunks).toString('utf8')
+          parsedBody = rawBody ? JSON.parse(rawBody) : {}
+        } catch (e) {
+          // ignore parse error; fallback to standard 401
+        }
       }
-    })
+      if (parsedBody && parsedBody.guest_id && parsedBody.product_id && parsedBody.seller_id) {
+        isGuestFlow = true
+        console.log('[conversations] Guest flow detected (no auth header).')
+      } else {
+        console.error('[conversations] Missing or invalid authorization header')
+        return res.status(401).json({ 
+          error: 'No autenticado. Se requiere token de usuario.',
+          details: {
+            reason: 'Missing or invalid authorization header',
+            timestamp: new Date().toISOString(),
+            origin: origin
+          }
+        })
+      }
+    } else {
+      console.error('[conversations] Missing or invalid authorization header')
+      return res.status(401).json({ 
+        error: 'No autenticado. Se requiere token de usuario.',
+        details: {
+          reason: 'Missing or invalid authorization header',
+          timestamp: new Date().toISOString(),
+          origin: origin
+        }
+      })
+    }
   }
-  const userToken = authHeader.split(' ')[1]
-  if (!userToken || userToken === SUPABASE_ANON_KEY) {
+  const userToken = authHeader ? authHeader.split(' ')[1] : null
+  if (!isGuestFlow && (!userToken || userToken === SUPABASE_ANON_KEY)) {
     console.error('[conversations] Invalid token: using anon key or empty token')
     return res.status(401).json({ 
       error: 'Se requiere token de usuario autenticado, no anon key',
@@ -84,7 +115,7 @@ export default async function handler(req, res) {
 
   // Validate JWT token format (should have 3 parts)
   const tokenParts = userToken.split('.')
-  if (tokenParts.length !== 3) {
+  if (!isGuestFlow && tokenParts.length !== 3) {
     console.error('[conversations] Invalid JWT format:', { tokenParts: tokenParts.length })
     return res.status(401).json({ 
       error: 'Formato de token inválido',
@@ -98,18 +129,19 @@ export default async function handler(req, res) {
 
   // Decode JWT to derive authenticated user id (for RLS alignment)
   let authUserId = null
-  try {
-    const payloadStr = userToken.split('.')[1]
-    if (payloadStr) {
-      // Fix base64 decoding - add padding if needed
-      const paddedPayload = payloadStr + '='.repeat((4 - payloadStr.length % 4) % 4)
-      const payload = JSON.parse(Buffer.from(paddedPayload, 'base64').toString('utf8'))
-      authUserId = payload.sub || payload.user_id || payload.id || null
-      console.log('[conversations] JWT decoded successfully:', { authUserId, payloadKeys: Object.keys(payload) })
+  if (!isGuestFlow) {
+    try {
+      const payloadStr = userToken.split('.')[1]
+      if (payloadStr) {
+        const paddedPayload = payloadStr + '='.repeat((4 - payloadStr.length % 4) % 4)
+        const payload = JSON.parse(Buffer.from(paddedPayload, 'base64').toString('utf8'))
+        authUserId = payload.sub || payload.user_id || payload.id || null
+        console.log('[conversations] JWT decoded successfully:', { authUserId, payloadKeys: Object.keys(payload) })
+      }
+    } catch (e) {
+      console.error('[conversations] Unable to decode JWT payload:', e.message)
+      console.error('[conversations] Token format issue - this may indicate an invalid token or encoding problem')
     }
-  } catch (e) {
-    console.error('[conversations] Unable to decode JWT payload:', e.message)
-    console.error('[conversations] Token format issue - this may indicate an invalid token or encoding problem')
   }
 
   // Generic JSON body parsing (Vercel may not populate req.body consistently)
@@ -134,7 +166,7 @@ export default async function handler(req, res) {
     // ================= MAIN COLLECTION (no action) =================
     if (!action && req.method === 'POST') {
       // Crear nueva conversación
-      const { buyer_id, seller_id, product_id, initial_message } = parsedBody || req.body || {}
+      const { buyer_id, seller_id, product_id, initial_message, guest_id } = parsedBody || req.body || {}
 
       console.log('[conversations] POST request:', {
         buyer_id,
@@ -145,13 +177,19 @@ export default async function handler(req, res) {
         token_length: userToken.length
       })
 
-      if (!buyer_id || !seller_id || !product_id) {
-        return res.status(400).json({ error: 'Faltan campos requeridos: buyer_id, seller_id, product_id' })
+      if (isGuestFlow) {
+        if (!guest_id || !seller_id || !product_id) {
+          return res.status(400).json({ error: 'Faltan campos requeridos para invitado: guest_id, seller_id, product_id' })
+        }
+      } else {
+        if (!buyer_id || !seller_id || !product_id) {
+          return res.status(400).json({ error: 'Faltan campos requeridos: buyer_id, seller_id, product_id' })
+        }
       }
 
       // TEMPORARY FIX: Allow requests even with auth issues for debugging
       // This will be removed once authentication is properly fixed
-      if (authUserId && authUserId !== buyer_id) {
+      if (!isGuestFlow && authUserId && authUserId !== buyer_id) {
         console.warn('[TEMPORARY] buyer_id mismatch - allowing for debugging', { 
           authUserId, 
           buyer_id,
@@ -161,7 +199,7 @@ export default async function handler(req, res) {
       }
       
       // If we couldn't decode the JWT, log warning but allow request
-      if (!authUserId) {
+      if (!isGuestFlow && !authUserId) {
         console.warn('[TEMPORARY] Could not decode JWT - allowing request for debugging', {
           tokenLength: userToken.length,
           tokenPreview: userToken.substring(0, 20) + '...',
@@ -171,6 +209,7 @@ export default async function handler(req, res) {
       }
 
       // Verificar si ya existe una conversación entre estos usuarios para este producto
+      const effectiveBuyerId = isGuestFlow ? guest_id : buyer_id
       const checkUrl = `${SUPABASE_URL}/rest/v1/conversations?product_id=eq.${product_id}&select=id,conversation_participants(user_id)`
       const checkResponse = await fetch(checkUrl, {
         headers: {
@@ -186,7 +225,7 @@ export default async function handler(req, res) {
         // Buscar conversación con ambos participantes
         for (const conv of existingConversations) {
           const participantIds = conv.conversation_participants?.map(p => p.user_id) || []
-          if (participantIds.includes(buyer_id) && participantIds.includes(seller_id)) {
+          if (participantIds.includes(effectiveBuyerId) && participantIds.includes(seller_id)) {
             // Ya existe conversación, solo enviar el mensaje
             if (initial_message) {
               const messageUrl = `${SUPABASE_URL}/rest/v1/messages`
@@ -200,7 +239,7 @@ export default async function handler(req, res) {
                 },
                 body: JSON.stringify({
                   conversation_id: conv.id,
-                  sender_id: buyer_id,
+                  sender_id: effectiveBuyerId,
                   content: initial_message,
                   message_type: 'message'
                 })
@@ -263,7 +302,7 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
           'Prefer': 'resolution=ignore-duplicates,return=minimal'
         },
-        body: JSON.stringify({ conversation_id: conversation.id, user_id: buyer_id })
+        body: JSON.stringify({ conversation_id: conversation.id, user_id: effectiveBuyerId })
       })
       if (!partBuyerRes.ok && partBuyerRes.status !== 409) {
         const t = await partBuyerRes.text()
@@ -282,7 +321,7 @@ export default async function handler(req, res) {
             'Content-Type': 'application/json',
             'Prefer': 'resolution=ignore-duplicates,return=minimal'
           },
-          body: JSON.stringify({ conversation_id: conversation.id, user_id: seller_id })
+            body: JSON.stringify({ conversation_id: conversation.id, user_id: seller_id })
         })
         if (!partSellerRes.ok && partSellerRes.status !== 409) {
           const t = await partSellerRes.text()
@@ -312,13 +351,15 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             conversation_id: conversation.id,
-            sender_id: buyer_id,
+            sender_id: effectiveBuyerId,
             content: initial_message,
             message_type: 'message'
           })
         })
       }
-
+      if (isGuestFlow) {
+        return res.status(201).json({ ...conversation, seller_pending: true, guest_id })
+      }
       return res.status(201).json({ ...conversation, seller_pending: sellerPending })
 
     } else if (!action && req.method === 'GET') {

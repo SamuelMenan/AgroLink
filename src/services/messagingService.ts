@@ -14,6 +14,15 @@ import { getAccessToken } from './apiAuth'
 import { apiClient } from './apiClient'
 import { checkAuthStatus } from '../utils/authFixHelper'
 
+// Helper para extraer mensaje de estructuras de error desconocidas
+function extractDebugMessage(debug: unknown): string | undefined {
+  if (debug && typeof debug === 'object' && 'message' in debug) {
+    const msg = (debug as { message?: unknown }).message
+    return typeof msg === 'string' ? msg : undefined
+  }
+  return undefined
+}
+
 // API Base URL - Use backend proxy to avoid RLS issues
 const API_BASE = '/api/proxy/api/v1'
 
@@ -52,37 +61,59 @@ export async function createConversation(
     
     // Get current user ID from token (stored as 'agrolink_access_token')
     const token = getAccessToken()
-    if (!token) {
-      throw new Error('No autenticado')
-    }
-    
-    // Check if user has anonymous token and redirect to login
+
+    // Anonymous / guest fallback: obtain guest_id when no token
     const authStatus = checkAuthStatus()
-    if (!authStatus.isValid || authStatus.role === 'anon') {
-      console.warn('[Messaging] Usuario anónimo detectado, redirigiendo a login')
-      // Store current location to redirect back after login
-      localStorage.setItem('redirect_after_login', window.location.href)
-      // Redirect to login
-      window.location.href = '/login?intent=messaging'
-      throw new Error('Por favor, inicia sesión para enviar mensajes')
+    let guestId: string | null = null
+    if (!token || !authStatus.isValid || authStatus.role === 'anon') {
+      try {
+        // Reuse cached guest_id if present
+        guestId = localStorage.getItem('agrolink_guest_id')
+        if (!guestId) {
+          const guestResp = await fetch('/api/auth/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+          if (guestResp.ok) {
+            const guestJson = await guestResp.json()
+            guestId = guestJson.guest_id
+            if (guestId) {
+              localStorage.setItem('agrolink_guest_id', guestId)
+            }
+          }
+        }
+      } catch (guestErr) {
+        console.warn('[createConversation] Guest provisioning falló:', guestErr)
+      }
+      if (!guestId) {
+        throw new Error('No autenticado y flujo invitado no disponible')
+      }
     }
     
     // Decode JWT to get user ID
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    const currentUserId = payload.sub || payload.user_id || payload.id
+    let currentUserId: string | null = null
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        currentUserId = payload.sub || payload.user_id || payload.id
+      } catch {
+        console.warn('[createConversation] No se pudo decodificar token, usando guestId')
+      }
+    }
+    if (!currentUserId && guestId) {
+      currentUserId = guestId
+    }
     
     if (!currentUserId) {
       throw new Error('No se pudo obtener el ID del usuario')
     }
     
-    console.log('[createConversation] Datos a enviar (RPC create_conversation):', {
+    console.log('[createConversation] Datos a enviar:', {
       product_id: productId,
       participant_ids: [currentUserId, participantId],
-      initial_message: initialMessage || null
+      initial_message: initialMessage || null,
+      mode: token ? 'authenticated' : 'guest'
     })
 
     // Paso 1: crear conversación y añadir participantes en una sola llamada RPC
-    const rpcResponse = await fetch(`/api/rpc?fn=create_conversation`, {
+    const rpcResponse = token ? await fetch(`/api/rpc?fn=create_conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,11 +124,11 @@ export async function createConversation(
         product_id: productId || null,
         participant_ids: [currentUserId, participantId]
       })
-    })
+    }) : { ok: false, status: 404 } as Response
 
     if (!rpcResponse.ok) {
       // Fallback si la función RPC no existe (404) o no permite método (405)
-      if (rpcResponse.status === 404 || rpcResponse.status === 405) {
+      if (rpcResponse.status === 404 || rpcResponse.status === 405 || !token) {
         console.warn('[createConversation] RPC no disponible (404 o 405). Usando fallback adaptativo.')
 
         // Intento 1: insertar según esquema remoto (buyer_id, seller_id, product_id)
@@ -107,11 +138,11 @@ export async function createConversation(
             product_id: productId || null,
             ...(initialMessage ? { initial_message: initialMessage } : {})
         }
-        let convResp = await fetch(`${API_BASE}/conversations`, {
+        const convResp = await fetch(`${API_BASE}/conversations`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
           },
           body: JSON.stringify(convAttemptBody1)
         })
@@ -127,17 +158,34 @@ export async function createConversation(
             const convAttemptBody2 = { product_id: productId || null }
             // Use apiClient to benefit from timeouts and retries
             try {
-              const convData = await apiClient.post<any>(`/api/v1/conversations`, convAttemptBody2)
-              // Simulate a Response-ok path using data
+              const convData = await apiClient.post<unknown>(`/api/v1/conversations`, convAttemptBody2)
+              // Derivar de forma segura el ID de la conversación en diferentes formatos
+              const derivedId = (
+                convData && typeof convData === 'object' && !Array.isArray(convData) && 'id' in convData ? (convData as { id?: string }).id :
+                Array.isArray(convData) && convData[0] && typeof convData[0] === 'object' && 'id' in convData[0] ? (convData[0] as { id?: string }).id :
+                (typeof convData === 'string' ? convData : undefined)
+              )
+              if (!derivedId) {
+                throw new Error('Fallback conversación creada pero no se pudo derivar ID')
+              }
               return {
-                id: convData.id || convData?.[0]?.id,
-                product_id: productId || null,
+                id: derivedId,
+                buyer_id: currentUserId,
+                buyer_name: '',
+                seller_id: participantId,
+                seller_name: '',
+                product_id: productId || '',
+                product_name: '',
+                status: 'pending',
+                last_message: initialMessage || undefined,
+                last_message_at: initialMessage ? new Date().toISOString() : undefined,
+                unread_count: 0,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
-                participants: [currentUserId, participantId]
-              } as unknown as Conversation
-            } catch (e) {
-              // If apiClient post failed, keep previous flow and let error handling continue
+                seller_pending: !token
+              } as Conversation
+            } catch {
+              // Si falla apiClient post, continuar con flujo previo y manejo de error normal
             }
             firstTxt = null
           }
@@ -157,7 +205,7 @@ export async function createConversation(
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             },
             body: JSON.stringify({ conversation_id: conversationId, user_id: uid })
           })
@@ -179,7 +227,7 @@ export async function createConversation(
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
               'x-client-request-id': Math.random().toString(36).slice(2)
             },
             body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage, type: 'message' })
@@ -192,16 +240,25 @@ export async function createConversation(
 
         return {
           id: conversationId,
-          product_id: productId || null,
+          buyer_id: currentUserId,
+          buyer_name: '',
+          seller_id: participantId,
+          seller_name: '',
+          product_id: productId || '',
+          product_name: '',
+          status: 'pending',
+          last_message: initialMessage || undefined,
+          last_message_at: initialMessage ? new Date().toISOString() : undefined,
+          unread_count: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          participants: [currentUserId, participantId]
-        } as unknown as Conversation
+          seller_pending: !token
+        } as Conversation
       }
 
       // Otros errores distintos de 404
       const errorText = await rpcResponse.text()
-      let errorData: { error?: string; details?: any; debug?: any } = {}
+      let errorData: { error?: string; details?: unknown; debug?: { message?: string } } = {}
       try { errorData = JSON.parse(errorText) } catch { errorData = { error: errorText } }
       console.error('[createConversation] Error RPC create_conversation:', {
         status: rpcResponse.status,
@@ -213,9 +270,9 @@ export async function createConversation(
       })
       let errorMessage = 'Error al crear la conversación'
       if (rpcResponse.status === 403) {
-        errorMessage = errorData.debug?.message || 'No tienes permisos para crear esta conversación. Por favor, verifica que estás autenticado.'
+        errorMessage = extractDebugMessage(errorData.debug) || 'No tienes permisos para crear esta conversación. Por favor, verifica que estás autenticado.'
       } else if (rpcResponse.status === 401) {
-        errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+        errorMessage = extractDebugMessage(errorData.debug) || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
       } else if (rpcResponse.status === 500) {
         errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
       } else if (errorData.error) {
@@ -228,7 +285,7 @@ export async function createConversation(
 
     // Paso 2: si hay mensaje inicial, enviarlo
     if (initialMessage) {
-      const msgResp = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
+      const msgResp = token ? await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -240,7 +297,7 @@ export async function createConversation(
           content: initialMessage,
           type: 'message'
         })
-      })
+      }) : { ok: false } as Response
       if (!msgResp.ok) {
         const errTxt = await msgResp.text()
         console.warn('[createConversation] Conversación creada pero fallo al enviar mensaje inicial', {
@@ -315,7 +372,7 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
   try {
     return await apiClient.get<Conversation[]>(`/api/v1/conversations?user_id=${userId}`)
-  } catch (e) {
+  } catch {
     // Fallback a fetch directo para mantener el manejo de errores detallado actual
   }
   const response = await fetch(`${API_BASE}/conversations?user_id=${userId}`, {
@@ -326,7 +383,7 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
   if (!response.ok) {
     const errorText = await response.text()
-    let errorData: { error?: string; details?: any; debug?: any } = {}
+    let errorData: { error?: string; details?: unknown; debug?: { message?: string } } = {}
     try {
       errorData = JSON.parse(errorText)
     } catch {
@@ -343,9 +400,9 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
     
     let errorMessage = 'Error al obtener conversaciones'
     if (response.status === 403) {
-      errorMessage = errorData.debug?.message || 'No tienes permisos para ver estas conversaciones.'
+      errorMessage = extractDebugMessage(errorData.debug) || 'No tienes permisos para ver estas conversaciones.'
     } else if (response.status === 401) {
-      errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      errorMessage = extractDebugMessage(errorData.debug) || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
     } else if (response.status === 500) {
       errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
     } else if (errorData.error) {
@@ -505,7 +562,7 @@ export async function sendMessage(
 
   if (!response.ok) {
     const errorText = await response.text()
-    let errorData: { error?: string; details?: any; debug?: any } = {}
+    let errorData: { error?: string; details?: unknown; debug?: { message?: string } } = {}
     try { errorData = JSON.parse(errorText) } catch { errorData = { error: errorText } }
 
     // If forbidden due to not being a participant, try to add and retry once
@@ -530,7 +587,7 @@ export async function sendMessage(
         if (retry.ok) {
           return retry.json() as Promise<Message>
         }
-      } catch (e) {
+      } catch {
         // fall through to error handling
       }
     }
@@ -553,11 +610,11 @@ export async function sendMessage(
 
     let errorMessage = 'Error al enviar mensaje'
     if (response.status === 403) {
-      errorMessage = errorData.debug?.message || 'No tienes permisos para enviar mensajes en esta conversación.'
+      errorMessage = extractDebugMessage(errorData.debug) || 'No tienes permisos para enviar mensajes en esta conversación.'
     } else if (response.status === 401) {
-      errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      errorMessage = extractDebugMessage(errorData.debug) || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
     } else if (response.status === 404) {
-      errorMessage = errorData.debug?.message || 'La conversación no existe o fue eliminada.'
+      errorMessage = extractDebugMessage(errorData.debug) || 'La conversación no existe o fue eliminada.'
     } else if (response.status === 500) {
       errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
     } else if (errorData.error) {
