@@ -133,21 +133,41 @@ export default async function handler(req, res) {
       const conversations = await conversationResponse.json()
       const conversation = conversations[0]
 
-      // Crear participantes
+      // Crear participantes (secuencial para cumplir RLS)
       const participantsUrl = `${SUPABASE_URL}/rest/v1/conversation_participants`
-      await fetch(participantsUrl, {
+      // Inserta primero al comprador (auth.uid())
+      const partBuyerRes = await fetch(participantsUrl, {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${userToken}`,
           'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
+          'Prefer': 'resolution=ignore-duplicates,return=minimal'
         },
-        body: JSON.stringify([
-          { conversation_id: conversation.id, user_id: buyer_id },
-          { conversation_id: conversation.id, user_id: seller_id }
-        ])
+        body: JSON.stringify({ conversation_id: conversation.id, user_id: buyer_id })
       })
+      if (!partBuyerRes.ok && partBuyerRes.status !== 409) {
+        const t = await partBuyerRes.text()
+        console.error('[conversations] Error adding buyer participant:', partBuyerRes.status, t)
+        return res.status(partBuyerRes.status).json({ error: 'No se pudo agregar participante comprador', details: t })
+      }
+
+      // Luego inserta al vendedor (permitido porque ya eres participante)
+      const partSellerRes = await fetch(participantsUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=ignore-duplicates,return=minimal'
+        },
+        body: JSON.stringify({ conversation_id: conversation.id, user_id: seller_id })
+      })
+      if (!partSellerRes.ok && partSellerRes.status !== 409) {
+        const t = await partSellerRes.text()
+        console.error('[conversations] Error adding seller participant:', partSellerRes.status, t)
+        return res.status(partSellerRes.status).json({ error: 'No se pudo agregar participante vendedor', details: t })
+      }
 
       // Enviar mensaje inicial si existe
       if (initial_message) {
