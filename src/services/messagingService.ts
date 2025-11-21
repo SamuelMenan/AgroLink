@@ -47,8 +47,8 @@ export async function createConversation(
   if (typeof buyerIdOrParams === 'object') {
     const { participantId, productId, initialMessage } = buyerIdOrParams
     
-    // Get current user ID from token
-    const token = localStorage.getItem('token')
+    // Get current user ID from token (stored as 'agrolink_access_token')
+    const token = localStorage.getItem('agrolink_access_token')
     if (!token) {
       throw new Error('No autenticado')
     }
