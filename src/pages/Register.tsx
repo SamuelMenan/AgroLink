@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import CaptchaGate from '../components/CaptchaGate'
 // OAuth/confirmaciones se manejarán completamente en backend.
 
 type Form = {
@@ -25,6 +26,8 @@ export default function Register() {
   const [facebookLoading, setFacebookLoading] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirmPwd, setShowConfirmPwd] = useState(false)
+  const [captchaSolved, setCaptchaSolved] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/dashboard'
   const intent = params.get('intent')
@@ -119,6 +122,7 @@ export default function Register() {
         email: form.email.trim(),
         password: form.password,
         phone: form.phone.replace(/\D/g, '') || undefined,
+        captchaToken: captchaToken || undefined,
       })
       if (error) {
         // Enhanced error handling for different scenarios
@@ -274,6 +278,10 @@ export default function Register() {
           <label htmlFor="terms" className="text-sm text-gray-700">Acepto los <a className="text-green-700 underline" href="#" onClick={(e)=>e.preventDefault()}>términos y condiciones</a>.</label>
         </div>
         {errors.terms && <p className="-mt-2 text-sm text-red-600">{errors.terms}</p>}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Verificación</label>
+          <CaptchaGate onChange={(ok) => setCaptchaSolved(ok)} onToken={(t) => setCaptchaToken(t)} />
+        </div>
         {errors.email && errors.email.includes('registrado') && (
           <div className="mt-2 text-sm text-blue-600">
             ¿Ya tienes una cuenta?{' '}
@@ -282,7 +290,7 @@ export default function Register() {
             </a>
           </div>
         )}
-        <button disabled={submitting || !pwdValid} type="submit" className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Creando cuenta…' : 'Registrarse'}</button>
+        <button disabled={submitting || !pwdValid || !captchaSolved} type="submit" className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Creando cuenta…' : 'Registrarse'}</button>
       </form>
 
       <div className="px-6 pb-6 md:px-8">

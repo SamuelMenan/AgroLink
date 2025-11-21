@@ -94,8 +94,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
         }, 
         body: JSON.stringify(body) 
       }, 6000) // 6s timeout for auth ops (refresh goes direct to Supabase)
-      // Si falla (405/5xx), intentar backend directo
-      if (!res.ok && [405, 502, 503, 504].includes(res.status) && !isSignUp) {
+      if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
         console.warn(`[apiAuth] Proxy failed with ${res.status}, attempting direct backend`, {
           endpoint: path,
           status: res.status,
@@ -103,8 +102,6 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
           sameOrigin: (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         })
         
-        // For 405 errors, always attempt direct backend regardless of origin
-        // For other errors, only attempt if same origin to avoid CORS issues
         const shouldAttemptDirect = res.status === 405 || (typeof window !== 'undefined' ? (new URL(BASE_URL).origin === window.location.origin) : true)
         
         if (shouldAttemptDirect) {
@@ -122,7 +119,6 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
               body: JSON.stringify(body) 
             }, 10000) // Increased timeout to 10s for direct requests
             console.log(`[apiAuth] Direct fetch result: ${directRes.status} (attempt ${attempt + 1})`)
-            // Use the direct response if it succeeds or returns a client error (4xx)
             if (directRes.ok || (directRes.status >= 400 && directRes.status < 500)) {
               res = directRes
             }
@@ -219,9 +215,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   throw lastError instanceof Error ? lastError : new Error('Auth request failed');
 }
 
-// Prefijo de autenticación apuntando siempre al backend vía rewrite proxy.
-// Evita 405 (ruta inexistente en serverless) y problemas CORS.
-const AUTH_PREFIX = '/api/proxy/api/v1/auth';
+const AUTH_PREFIX = import.meta.env.DEV ? '/api/v1/auth' : '/api/proxy/api/v1/auth';
 
 // Llamada directa a Supabase como último recurso para refrescar tokens.
 async function supabaseRefreshFallback(refresh_token: string): Promise<BackendAuthResponse> {
@@ -295,7 +289,7 @@ async function supabaseSignInFallback(params: { email?: string; phone?: string; 
   return JSON.parse(text) as BackendAuthResponse;
 }
 
-export async function signUp(fullName: string, email: string, password: string, phone?: string) {
+export async function signUp(fullName: string, email: string, password: string, phone?: string, captchaToken?: string) {
   // Support phone-only registration - backend will generate email if needed
   const basePayload: Record<string, unknown> = { password, data: { full_name: fullName } };
   const hasEmail = !!(email && email.trim());
@@ -303,6 +297,7 @@ export async function signUp(fullName: string, email: string, password: string, 
 
   if (hasEmail) basePayload.email = email.trim();
   if (hasPhone) basePayload.phone = phone!.trim();
+  if (captchaToken) basePayload[captchaFieldName()] = captchaToken;
 
   // Pre-warm proxy/backend (health) antes de intentar alta, mitigando 502 por cold start
   try { await warmupProxy(); } catch { /* ignore */ }
@@ -320,6 +315,7 @@ export async function signUp(fullName: string, email: string, password: string, 
         throw new Error('El registro por correo está deshabilitado. Regístrate con tu número de teléfono o usa Google/Facebook.');
       }
       const phoneOnly: Record<string, unknown> = { password, data: { full_name: fullName }, phone: phone!.trim() };
+      if (captchaToken) phoneOnly[captchaFieldName()] = captchaToken;
       const resp = await post(`${AUTH_PREFIX}/sign-up`, phoneOnly);
       if (resp.access_token && resp.refresh_token) setTokens(resp);
       try { await warmupProxy(); } catch { /* ignore */ }
@@ -434,7 +430,7 @@ const resolveBaseUrl = () => {
     return effective;
   }
 
-  const effective = envBackend || 'http://localhost:8080';
+  const effective = envBackend || 'https://agrolinkbackend.onrender.com';
   console.info('[apiAuth] ENV DEV. VITE_BACKEND_URL =', envBackend, 'BASE_URL =', effective);
   return effective;
 };
@@ -443,7 +439,7 @@ const BASE_URL = resolveBaseUrl();
 
 // Usar siempre ruta proxied para evitar fallos de CORS/502 en redirecciones OAuth.
 export const getOAuthStartUrl = (provider: string, next: string) =>
-  `/api/proxy/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+  `${import.meta.env.DEV ? '/api/v1/auth' : '/api/proxy/api/v1/auth'}/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
 
 function captchaFieldName() {
   const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
