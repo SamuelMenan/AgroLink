@@ -382,7 +382,7 @@ export default async function handler(req, res) {
         }
         return res.status(200).json(await msgResp.json())
       } else if (req.method === 'POST') {
-        const { conversation_id, sender_id, content, type, is_from_buyer, in_reply_to, quick_request_type, quick_response_type } = req.body
+        const { conversation_id, sender_id, content, type, is_from_buyer, in_reply_to, quick_request_type, quick_response_type } = parsedBody || req.body || {}
         if (!conversation_id || !sender_id || !content || conversation_id !== targetId) {
           return res.status(400).json({ error: 'Datos de mensaje inválidos' })
         }
