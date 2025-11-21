@@ -117,7 +117,7 @@ describe('Error Handling Tests', () => {
         'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA'
       ]
       
-      const invalidUUIDs = [
+      const invalidUUIDs: Array<string | null | undefined> = [
         'invalid-uuid',
         '123',
         '8c08d3cd-765f-4f70-b2bf', // too short
@@ -132,7 +132,11 @@ describe('Error Handling Tests', () => {
       })
 
       invalidUUIDs.forEach(uuid => {
-        expect(uuidRegex.test(uuid)).toBe(false)
+        if (uuid == null) {
+          expect(uuidRegex.test('')).toBe(false)
+        } else {
+          expect(uuidRegex.test(uuid)).toBe(false)
+        }
       })
     })
   })
@@ -141,7 +145,7 @@ describe('Error Handling Tests', () => {
     it('should implement fallback mechanisms for API failures', () => {
       // Simulate primary API failure
       const primaryApiFailed = true
-      const fallbackData = []
+      const fallbackData: unknown[] = []
       
       const result = primaryApiFailed ? fallbackData : ['data']
       
