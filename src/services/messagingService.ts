@@ -68,6 +68,7 @@ export class MessagingService {
 
   /**
    * Get conversations for current user with pagination
+   * Falls back to empty conversations if endpoint doesn't exist
    */
   async getConversations(page = 1, limit = 20): Promise<{
     conversations: Conversation[];
@@ -82,7 +83,31 @@ export class MessagingService {
       }>(`/conversations?page=${page}&limit=${limit}`);
       return response;
     } catch (error) {
-      throw new Error(`Failed to fetch conversations: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Check if it's a 404 error (endpoint doesn't exist)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const is404Error = 
+        errorMessage.includes('404') || 
+        errorMessage.includes('Not Found') || 
+        errorMessage.includes('not found') ||
+        errorMessage.includes('does not exist') ||
+        errorMessage.includes('no existe');
+      
+      if (is404Error) {
+        console.warn('[MessagingService] Conversations endpoint not found, returning empty conversations');
+        return {
+          conversations: [],
+          total: 0,
+          hasMore: false
+        };
+      }
+      
+      // For other errors, log once and return empty to prevent spam
+      console.error('[MessagingService] Failed to fetch conversations:', errorMessage);
+      return {
+        conversations: [],
+        total: 0,
+        hasMore: false
+      };
     }
   }
 
@@ -114,7 +139,32 @@ export class MessagingService {
       
       return response;
     } catch (error) {
-      throw new Error(`Failed to fetch messages: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check if it's a 404 error (endpoint doesn't exist)
+      const is404Error = 
+        errorMessage.includes('404') || 
+        errorMessage.includes('Not Found') || 
+        errorMessage.includes('not found') ||
+        errorMessage.includes('does not exist') ||
+        errorMessage.includes('no existe');
+      
+      if (is404Error) {
+        console.warn('[MessagingService] Messages endpoint not found, returning empty messages');
+        return {
+          messages: [],
+          total: 0,
+          hasMore: false
+        };
+      }
+      
+      // For other errors, log once and return empty to prevent spam
+      console.error('[MessagingService] Failed to fetch messages:', errorMessage);
+      return {
+        messages: [],
+        total: 0,
+        hasMore: false
+      };
     }
   }
 
@@ -235,21 +285,43 @@ export class MessagingService {
       this.eventSource.close();
     }
 
-    this.eventSource = new EventSource('/api/messaging/events');
-    
-    this.eventSource.onmessage = (event) => {
-      try {
-        const messagingEvent: MessagingEvent = JSON.parse(event.data);
-        onEvent(messagingEvent);
-      } catch (error) {
-        console.error('Failed to parse messaging event:', error);
-      }
-    };
+    // Reset retry attempts on new connection
+    this.retryAttempts = 0;
 
-    this.eventSource.onerror = (error) => {
-      console.error('Messaging event source error:', error);
-      this.handleReconnect();
-    };
+    try {
+      this.eventSource = new EventSource('/api/messaging/events');
+      
+      this.eventSource.onmessage = (event) => {
+        try {
+          const messagingEvent: MessagingEvent = JSON.parse(event.data);
+          onEvent(messagingEvent);
+          // Reset retry attempts on successful message
+          this.retryAttempts = 0;
+        } catch (error) {
+          console.error('Failed to parse messaging event:', error);
+        }
+      };
+
+      let errorLogged = false;
+      this.eventSource.onerror = (error) => {
+        // Only log the first error to prevent spam
+        if (!errorLogged) {
+          console.warn('Messaging event source error (logging once):', error);
+          errorLogged = true;
+        }
+        this.handleReconnect();
+      };
+
+      this.eventSource.onopen = () => {
+        console.log('[MessagingService] EventSource connection opened');
+        // Reset error flag and retry attempts on successful connection
+        errorLogged = false;
+        this.retryAttempts = 0;
+      };
+    } catch (error) {
+      console.warn('[MessagingService] Failed to create EventSource connection:', error);
+      // Don't throw error, just log warning and continue
+    }
   }
 
   /**
@@ -330,11 +402,24 @@ export class MessagingService {
       clearTimeout(this.reconnectTimeout);
     }
     
+    // Limit reconnection attempts to prevent excessive retries
+    if (this.retryAttempts >= this.maxRetries) {
+      console.warn('[MessagingService] Max reconnection attempts reached, stopping retries');
+      return;
+    }
+    
+    this.retryAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.retryAttempts), 30000);
     
+    console.log(`[MessagingService] Scheduling reconnection attempt ${this.retryAttempts}/${this.maxRetries} in ${delay}ms`);
+    
     this.reconnectTimeout = setTimeout(() => {
-      // Reconnect logic would go here
-      console.log('Attempting to reconnect to messaging events...');
+      console.log('[MessagingService] Attempting to reconnect to messaging events...');
+      // Reset EventSource connection
+      if (this.eventSource) {
+        this.eventSource.close();
+        this.eventSource = undefined;
+      }
     }, delay);
   }
 

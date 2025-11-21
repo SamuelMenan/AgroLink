@@ -280,10 +280,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
       const response = await messagingService.getConversations(page);
       dispatch({ type: 'SET_CONVERSATIONS', payload: response.conversations });
     } catch (error) {
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : 'Failed to load conversations' 
-      });
+      // Don't set error state for 404 errors to prevent UI disruption
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load conversations';
+      const is404Error = 
+        errorMessage.includes('404') || 
+        errorMessage.includes('Not Found') || 
+        errorMessage.includes('not found');
+      
+      if (!is404Error) {
+        dispatch({ 
+          type: 'SET_ERROR', 
+          payload: errorMessage 
+        });
+      }
+      // Always clear loading state
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -296,10 +307,21 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
         payload: { conversationId, messages: response.messages } 
       });
     } catch (error) {
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : 'Failed to load messages' 
-      });
+      // Don't set error state for 404 errors to prevent UI disruption
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load messages';
+      const is404Error = 
+        errorMessage.includes('404') || 
+        errorMessage.includes('Not Found') || 
+        errorMessage.includes('not found');
+      
+      if (!is404Error) {
+        dispatch({ 
+          type: 'SET_ERROR', 
+          payload: errorMessage 
+        });
+      }
+      // Always clear loading state
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
