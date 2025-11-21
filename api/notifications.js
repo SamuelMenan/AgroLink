@@ -8,22 +8,7 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 export default async function handler(req, res) {
-  const startTime = Date.now()
-  const requestId = Math.random().toString(36).substr(2, 9)
-  const method = (req.method || 'GET').toUpperCase()
-  
-  // Production logging
-  if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
-    console.log(`[NOTIFICATIONS-${requestId}] Starting request:`, {
-      method: method,
-      url: req.url,
-      origin: req.headers.origin,
-      userAgent: req.headers['user-agent'],
-      timestamp: new Date().toISOString()
-    })
-  }
-  
-  // Production CORS configuration
+  // Add CORS headers immediately at the start
   const origin = req.headers.origin
   const allowedOrigins = [
     'https://agro-link-jet.vercel.app',
@@ -40,11 +25,25 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*')
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   
-  if (method === 'OPTIONS') {
+  if (req.method === 'OPTIONS') {
     res.status(204).end()
     return
   }
-
+  const startTime = Date.now()
+  const requestId = Math.random().toString(36).substr(2, 9)
+  const method = (req.method || 'GET').toUpperCase()
+  
+  // Production logging
+  if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
+    console.log(`[NOTIFICATIONS-${requestId}] Starting request:`, {
+      method: method,
+      url: req.url,
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date().toISOString()
+    })
+  }
+  
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const supabaseAnon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
   
@@ -54,10 +53,59 @@ export default async function handler(req, res) {
   }
 
   const urlObj = new URL(req.url, 'http://localhost')
-  const userId = urlObj.searchParams.get('user_id') || ''
+  const pathParts = urlObj.pathname.split('/')
+  const isUnreadCount = pathParts.includes('unread-count')
+  const userId = urlObj.searchParams.get('user_id') || (isUnreadCount ? pathParts[pathParts.length - 1] : '')
 
   try {
     if (method === 'GET') {
+      // Handle unread-count endpoint
+      if (isUnreadCount) {
+        if (!userId) {
+          res.status(400).json({ error: 'user_id requerido' })
+          return
+        }
+        
+        try {
+          // Count unread notifications for user
+          const countUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/notifications?user_id=eq.${userId}&read_at=is.null&select=id`
+          console.log(`[NOTIFICATIONS-${requestId}] Counting unread notifications for user:`, userId)
+          
+          const authHeader = req.headers['authorization']
+          if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
+            console.error(`[NOTIFICATIONS-${requestId}] Missing authorization for unread count`)
+            res.status(401).json({ error: 'Authorization requerido' })
+            return
+          }
+          
+          const countResp = await fetch(countUrl, {
+            headers: {
+              'apikey': supabaseAnon,
+              'Authorization': authHeader,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (!countResp.ok) {
+            const errorText = await countResp.text()
+            console.error(`[NOTIFICATIONS-${requestId}] Error counting unread:`, countResp.status, errorText)
+            res.status(countResp.status).json({ error: 'Error al contar notificaciones', details: errorText })
+            return
+          }
+          
+          const notifications = await countResp.json()
+          const unreadCount = Array.isArray(notifications) ? notifications.length : 0
+          
+          console.log(`[NOTIFICATIONS-${requestId}] Unread count for user ${userId}:`, unreadCount)
+          res.status(200).json({ ok: true, count: unreadCount })
+          return
+        } catch (error) {
+          console.error(`[NOTIFICATIONS-${requestId}] Error in unread count:`, error)
+          res.status(500).json({ error: 'Error interno al contar notificaciones', details: error.message })
+          return
+        }
+      }
+      
       // Get user notifications - consolidated from by-user.js
       if (!userId) {
         res.status(400).json({ error: 'user_id requerido' })

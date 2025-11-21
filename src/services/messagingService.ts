@@ -369,82 +369,102 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 
   // Use apiClient for GET with retries/timeouts
   try {
-    return await apiClient.get<Message[]>(`/api/v1/conversations?action=messages&id=${conversationId}`)
+    const data = await apiClient.get<Message[]>(`/api/v1/conversations?action=messages&id=${conversationId}`)
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : []
   } catch (e) {
-    // Fallback to direct fetch to preserve existing error mapping
+    console.warn('[getMessages] apiClient failed, falling back to direct fetch:', e)
   }
-  const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'x-client-request-id': Math.random().toString(36).slice(2)
-    }
-  })
+  
+  try {
+    const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'x-client-request-id': Math.random().toString(36).slice(2)
+      }
+    })
 
-  // Debug log for response
-  console.log('[getMessages] Response status:', response.status)
-  if (response.ok) {
-    const data = await response.json()
-    console.log('[getMessages] Messages received:', data.length)
-    data.forEach((msg: Message, i: number) => {
-      console.log(`[getMessages] Message ${i}:`, {
-        id: msg.id,
-        sender_id: msg.sender_id,
-        sender_name: msg.sender_name,
-        content: msg.content.substring(0, 50)
+    // Debug log for response
+    console.log('[getMessages] Response status:', response.status)
+    if (response.ok) {
+      const data = await response.json()
+      console.log('[getMessages] Messages received:', data.length)
+      data.forEach((msg: Message, i: number) => {
+        console.log(`[getMessages] Message ${i}:`, {
+          id: msg.id,
+          sender_id: msg.sender_id,
+          sender_name: msg.sender_name,
+          content: msg.content.substring(0, 50)
+        })
       })
-    })
-    return data
-  }
-
-  // Rest of error handling...
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    let errorData: { error?: string } = {}
-    try {
-      errorData = JSON.parse(errorText)
-    } catch {
-      errorData = { error: errorText }
+      // Ensure we always return an array
+      return Array.isArray(data) ? data : []
     }
-    
-    console.error('[getMessages] Error response:', {
-      status: response.status,
-      statusText: response.statusText,
-      errorData,
-      url: `${API_BASE}/conversations?action=messages&id=${conversationId}`
-    })
-    
-    if (response.status === 403 && /No eres participante/i.test(errorText)) {
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errorData: { error?: string } = {}
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        const currentUserId = payload.sub || payload.user_id || payload.id
-        if (currentUserId) {
-          await addParticipant(conversationId, currentUserId)
-          const retry = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      
+      console.error('[getMessages] Error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        url: `${API_BASE}/conversations?action=messages&id=${conversationId}`
+      })
+      
+      if (response.status === 403 && /No eres participante/i.test(errorText)) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          const currentUserId = payload.sub || payload.user_id || payload.id
+          if (currentUserId) {
+            await addParticipant(conversationId, currentUserId)
+            const retry = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            })
+            if (retry.ok) {
+              const retryData = await retry.json()
+              return Array.isArray(retryData) ? retryData : []
             }
-          })
-          if (retry.ok) {
-            return retry.json()
           }
-        }
-      } catch {}
+        } catch {}
+      }
+
+      // Return empty array for non-critical errors instead of throwing
+      if (response.status === 400 || response.status === 404) {
+        console.warn('[getMessages] Returning empty array due to non-critical error')
+        return []
+      }
+
+      let errorMessage = 'Error al obtener mensajes'
+      if (response.status === 401) {
+        errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      } else if (response.status === 404) {
+        errorMessage = 'La conversación no existe o fue eliminada.'
+      } else if (errorData.error) {
+        errorMessage = errorData.error
+      }
+      
+      throw new Error(errorMessage)
     }
 
-    let errorMessage = 'Error al obtener mensajes'
-    if (response.status === 401) {
-      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
-    } else if (response.status === 404) {
-      errorMessage = 'La conversación no existe o fue eliminada.'
-    } else if (errorData.error) {
-      errorMessage = errorData.error
+    try {
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    } catch (e) {
+      console.error('[getMessages] Failed to parse JSON response:', e)
+      return []
     }
-    
-    throw new Error(errorMessage)
+  } catch (error) {
+    console.error('[getMessages] Unexpected error:', error)
+    return []
   }
-
-  return response.json()
 }
 
 // Send a text message

@@ -361,31 +361,49 @@ export default async function handler(req, res) {
     } else if (action === 'messages') {
       if (!targetId) return res.status(400).json({ error: 'id requerido (conversation id)' })
       if (req.method === 'GET') {
-        // Verify participant
-        const participantCheckUrl = `${SUPABASE_URL}/rest/v1/conversation_participants?conversation_id=eq.${targetId}&select=user_id`
-        const partResp = await fetch(participantCheckUrl, {
-          headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
-        })
-        if (!partResp.ok) {
-          return res.status(partResp.status).json({ error: 'Error al verificar participante', details: await partResp.text() })
+        try {
+          // Verify participant
+          const participantCheckUrl = `${SUPABASE_URL}/rest/v1/conversation_participants?conversation_id=eq.${targetId}&select=user_id`
+          const partResp = await fetch(participantCheckUrl, {
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
+          })
+          if (!partResp.ok) {
+            console.error('[conversations] Participant verification failed:', partResp.status, await partResp.text())
+            return res.status(partResp.status).json({ error: 'Error al verificar participante', details: await partResp.text() })
+          }
+          const partJson = await partResp.json()
+          if (!Array.isArray(partJson) || partJson.length === 0) {
+            return res.status(403).json({ error: 'No eres participante de esta conversación' })
+          }
+          
+          // Get messages with proper error handling
+          const messagesUrl = `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${targetId}&order=created_at.asc&select=*,sender:sender_id(id,full_name)`
+          console.log('[conversations] Fetching messages from:', messagesUrl)
+          const msgResp = await fetch(messagesUrl, {
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
+          })
+          
+          if (!msgResp.ok) {
+            const errorText = await msgResp.text()
+            console.error('[conversations] Messages fetch failed:', msgResp.status, errorText)
+            return res.status(msgResp.status).json({ error: 'Error al obtener mensajes', details: errorText })
+          }
+          
+          const raw = await msgResp.json()
+          console.log('[conversations] Raw messages response:', raw)
+          
+          // Ensure we always return an array, even if response is malformed
+          const messagesArray = Array.isArray(raw) ? raw : []
+          const enriched = messagesArray.map(m => ({
+            ...m,
+            sender_name: m.sender?.full_name || null
+          }))
+          console.log('[conversations] Returning enriched messages:', enriched.length)
+          return res.status(200).json(enriched)
+        } catch (error) {
+          console.error('[conversations] Error in messages action:', error)
+          return res.status(500).json({ error: 'Error interno al obtener mensajes', details: error.message })
         }
-        const partJson = await partResp.json()
-        if (!Array.isArray(partJson) || partJson.length === 0) {
-          return res.status(403).json({ error: 'No eres participante de esta conversación' })
-        }
-        const messagesUrl = `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${targetId}&order=created_at.asc&select=*,sender:sender_id(id,full_name)`
-        const msgResp = await fetch(messagesUrl, {
-          headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
-        })
-        if (!msgResp.ok) {
-          return res.status(msgResp.status).json({ error: 'Error al obtener mensajes', details: await msgResp.text() })
-        }
-        const raw = await msgResp.json()
-        const enriched = raw.map(m => ({
-          ...m,
-          sender_name: m.sender?.full_name || null
-        }))
-        return res.status(200).json(enriched)
       } else if (req.method === 'POST') {
         const { conversation_id, sender_id, content, type, is_from_buyer, in_reply_to, quick_request_type, quick_response_type } = parsedBody || req.body || {}
         if (!conversation_id || !sender_id || !content || conversation_id !== targetId) {

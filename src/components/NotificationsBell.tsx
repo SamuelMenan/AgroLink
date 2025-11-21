@@ -36,8 +36,9 @@ export default function NotificationsBell() {
           getUnreadCount(user.id),
           listRecentNotifications(user.id, 12),
         ])
+        console.log('[NotificationsBell] init results:', { cnt, recent: Array.isArray(recent) ? recent.length : 'not array' })
         setUnread(cnt)
-        setItems(recent)
+        setItems(Array.isArray(recent) ? recent : [])
         setError(null)
         off = subscribeNotifications(user.id, (n)=>{
           setItems((prev)=> [n, ...prev].slice(0, 12))

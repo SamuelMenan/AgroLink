@@ -22,6 +22,7 @@ import {
   joinConversation
 } from '../services/messagingService'
 import { Send, MessageCircle, ShoppingCart } from 'lucide-react'
+import { logError, logWarning, logInfo } from '../services/errorLogging'
 
 interface MessageCenterProps {
   initialConversation?: Conversation
@@ -51,9 +52,39 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
     deliveryMethod: 'encuentro' as const,
     paymentMethod: 'contra_entrega' as const
   })
-  // const [purchaseAgreement, setPurchaseAgreement] = useState<CompraAcuerdo | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  // const [isRetrying, setIsRetrying] = useState(false)
   
+  // Enhanced logging for debugging
+  const componentId = useRef(`MessageCenter-${Date.now()}`).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  
+  // Log component lifecycle
+  useEffect(() => {
+    logInfo(`MessageCenter component mounted`, {
+      componentId,
+      hasInitialConversation: !!initialConversation,
+      hasProductData: !!productData,
+      userId: user?.id
+    })
+    
+    return () => {
+      logInfo(`MessageCenter component unmounted`, { componentId })
+    }
+  }, [])
+  
+  // Log state changes for debugging
+  useEffect(() => {
+    logInfo(`MessageCenter state updated`, {
+      componentId,
+      conversationsCount: conversations.length,
+      messagesCount: messages.length,
+      selectedConversationId: selectedConversation?.id,
+      isLoading,
+      error
+    })
+  }, [conversations.length, messages.length, selectedConversation?.id, isLoading, error])
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -92,14 +123,42 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
   }, [selectedConversation])
 
   const loadConversations = async () => {
-    if (!user) return
+    if (!user?.id) {
+      logWarning('Cannot load conversations: no user ID', { componentId })
+      return
+    }
+    
+    const startTime = Date.now()
+    logInfo('Starting conversation load', { componentId, userId: user.id })
     
     try {
       setIsLoading(true)
+      setError(null)
+      
       const data = await getConversations(user.id)
+      
+      const loadTime = Date.now() - startTime
+      logInfo('Conversations loaded successfully', { 
+        componentId, 
+        conversationsCount: data.length,
+        loadTimeMs: loadTime
+      })
+      
       setConversations(data)
     } catch (error) {
-      console.error('Error loading conversations:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      logError('Failed to load conversations', error as Error, {
+        componentId,
+        userId: user.id,
+        loadTimeMs: Date.now() - startTime
+      })
+      
+      setError(`Error al cargar conversaciones: ${errorMessage}`)
+      
+      // Don't set empty arrays on error - keep existing data if available
+      if (conversations.length === 0) {
+        setConversations([])
+      }
     } finally {
       setIsLoading(false)
     }
@@ -118,9 +177,16 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
   const loadMessages = async (conversationId: string) => {
     try {
       const data = await getMessages(conversationId)
-      setMessages(data)
+      // Ensure data is always an array, even if API returns null/undefined
+      setMessages(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error loading messages:', error)
+      // Set empty array on error to prevent .map() errors
+      setMessages([])
+      // Show user-friendly error notification
+      if (error instanceof Error) {
+        console.error('Failed to load messages:', error.message)
+      }
     }
   }
 
@@ -371,21 +437,60 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
         seller_name: selectedConversation.seller_name
       } : null
     })
+
+    // Format timestamp
+    const formatTime = (timestamp: string) => {
+      const date = new Date(timestamp)
+      return date.toLocaleTimeString('es-CO', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      })
+    }
+
+    // Get avatar initials
+    const getAvatarInitials = (name: string) => {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    }
+
+    // Get avatar color based on sender
+    const getAvatarColor = (senderId: string) => {
+      const colors = ['bg-green-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500']
+      const colorIndex = senderId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length
+      return colors[colorIndex]
+    }
     
     return (
-      <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'} mb-3`}>
-        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isFromCurrentUser 
-            ? 'bg-blue-500 text-white' 
-            : 'bg-gray-200 text-gray-800'
-        }`}>
-          <p className="text-[11px] font-semibold opacity-70 mb-0.5">{otherName}</p>
-          <p className="text-sm">{message.content}</p>
-          <p className="text-xs mt-1 opacity-70">
-            {new Date(message.created_at).toLocaleTimeString()}
-          </p>
+      <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'} mb-4`}>
+        {!isFromCurrentUser && (
+          <div className="flex-shrink-0 mr-3">
+            <div className={`w-8 h-8 rounded-full ${getAvatarColor(message.sender_id)} flex items-center justify-center text-white text-sm font-medium`}>
+              {getAvatarInitials(otherName)}
+            </div>
+          </div>
+        )}
+        
+        <div className={`max-w-xs lg:max-w-md ${isFromCurrentUser ? 'order-1' : ''}`}>
+          {/* Sender name and timestamp */}
+          <div className={`flex items-center mb-1 ${isFromCurrentUser ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-xs text-gray-500 mr-2">
+              {formatTime(message.created_at)}
+            </span>
+            <span className="text-xs font-medium text-gray-700">
+              {otherName}
+            </span>
+          </div>
           
-          {/* Show quick response buttons for sellers */}
+          {/* Message bubble */}
+          <div className={`px-4 py-3 rounded-lg shadow-sm ${
+            isFromCurrentUser 
+              ? 'bg-blue-500 text-white rounded-br-none' 
+              : 'bg-white text-gray-800 rounded-bl-none border border-gray-200'
+          }`}>
+            <p className="text-sm leading-relaxed">{message.content}</p>
+          </div>
+          
+          {/* Quick response buttons for sellers */}
           {!isFromCurrentUser && message.type === 'quick_request' && user?.id === selectedConversation?.seller_id && (
             <div className="mt-2 flex flex-wrap gap-1">
               {QUICK_RESPONSES.map(response => (
@@ -412,6 +517,15 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
             </div>
           )}
         </div>
+        
+        {/* Avatar for current user (on the right) */}
+        {isFromCurrentUser && (
+          <div className="flex-shrink-0 ml-3">
+            <div className={`w-8 h-8 rounded-full ${getAvatarColor(message.sender_id)} flex items-center justify-center text-white text-sm font-medium`}>
+              {getAvatarInitials(otherName)}
+            </div>
+          </div>
+        )}
       </div>
     )
   }

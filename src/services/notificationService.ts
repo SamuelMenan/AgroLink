@@ -20,16 +20,31 @@ const API_BASE = '/api/v1/notifications'
 import { apiFetch } from './apiClient'
 
 export async function listRecentNotifications(userId: string, limit = 12): Promise<NotificationItem[]> {
-  const res = await apiFetch(`${API_BASE}/by-user/${userId}?limit=${limit}`)
+  const res = await apiFetch(`${API_BASE}?user_id=${userId}&limit=${limit}`)
   if (!res.ok) throw new Error('No se pudieron listar notificaciones')
   return await res.json()
 }
 
 export async function getUnreadCount(userId: string): Promise<number> {
   const res = await apiFetch(`${API_BASE}/unread-count/${userId}`)
-  if (!res.ok) throw new Error('No se pudo obtener conteo no leídas')
-  const rows = await res.json()
-  return Array.isArray(rows) ? rows.length : 0
+  if (!res.ok) {
+    console.warn('Failed to get unread count, returning 0:', res.status)
+    return 0
+  }
+  
+  try {
+    const data = await res.json()
+    // Handle both old format (array) and new format (object with count)
+    if (Array.isArray(data)) {
+      return data.length
+    } else if (data && typeof data === 'object' && 'count' in data) {
+      return data.count || 0
+    }
+    return 0
+  } catch (error) {
+    console.error('Error parsing unread count response:', error)
+    return 0
+  }
 }
 
 export async function markAsRead(id: string): Promise<void> {
