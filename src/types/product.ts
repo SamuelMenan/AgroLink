@@ -22,7 +22,7 @@ export type Product = {
   department?: string
   municipality?: string
   detailed_description?: string
-  condition?: 'new' | 'used' | 'refurbished'
+  condition?: 'new' | 'used' | 'seasonal'
   stock_available?: boolean
 }
 

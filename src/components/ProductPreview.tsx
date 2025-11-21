@@ -23,7 +23,7 @@ export default function ProductPreview({ formData, onClose }: ProductPreviewProp
     switch (condition) {
       case 'new': return 'Nuevo'
       case 'used': return 'Usado'
-      case 'refurbished': return 'Reacondicionado'
+      case 'seasonal': return 'De temporada'
       default: return 'Sin especificar'
     }
   }

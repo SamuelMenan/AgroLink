@@ -40,7 +40,7 @@ export default function PublishProduct() {
         department: values.department,
         municipality: values.municipality,
         detailedDescription: values.detailedDescription?.trim() || undefined,
-        condition: values.condition,
+        condition: values.condition as 'new' | 'used' | 'refurbished',
         stockAvailable: values.stockAvailable,
       })
       setPublishedId(created.id)

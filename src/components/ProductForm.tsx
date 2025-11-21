@@ -23,7 +23,7 @@ export type ProductFormValues = {
   department?: string
   municipality?: string
   detailedDescription?: string
-  condition?: 'new' | 'used' | 'refurbished'
+  condition?: 'new' | 'used' | 'seasonal'
   stockAvailable?: boolean
 }
 
@@ -201,7 +201,7 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
             >
               <option value="new">Nuevo</option>
               <option value="used">Usado</option>
-              <option value="refurbished">Reacondicionado</option>
+              <option value="seasonal">De temporada</option>
             </select>
             {errors.condition && <p className="mt-1 text-sm text-red-600">{errors.condition}</p>}
           </div>

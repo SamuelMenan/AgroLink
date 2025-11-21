@@ -91,7 +91,7 @@ describe('Product Form Validation', () => {
 
   describe('Product Condition Validation', () => {
     it('should accept valid conditions', () => {
-      const conditions: Array<'new' | 'used' | 'refurbished'> = ['new', 'used', 'refurbished']
+      const conditions: Array<'new' | 'used' | 'seasonal'> = ['new', 'used', 'seasonal']
       conditions.forEach(condition => {
         const data = { ...validFormData, condition }
         const errors = validateProductForm(data)
