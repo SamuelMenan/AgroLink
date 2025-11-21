@@ -96,53 +96,74 @@ export async function createConversation(
     if (!rpcResponse.ok) {
       // Fallback si la función RPC no existe (404) -> crear manualmente
       if (rpcResponse.status === 404) {
-        console.warn('[createConversation] RPC no disponible (404). Usando fallback por pasos.')
-        // Paso A: crear conversación vacía
-        const convResp = await fetch(`${API_BASE}/conversations`, {
+        console.warn('[createConversation] RPC no disponible (404). Usando fallback adaptativo.')
+
+        // Intento 1: insertar según esquema remoto (buyer_id, seller_id, product_id)
+        const convAttemptBody1 = {
+          buyer_id: currentUserId,
+            seller_id: participantId,
+            product_id: productId || null,
+            ...(initialMessage ? { initial_message: initialMessage } : {})
+        }
+        let convResp = await fetch(`${API_BASE}/conversations`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ product_id: productId || null })
+          body: JSON.stringify(convAttemptBody1)
         })
+
+        // Si falla porque faltan campos requeridos distintos, reintentar con solo product_id
+        if (!convResp.ok) {
+          const firstTxt = await convResp.text()
+          if (convResp.status === 400 && /Faltan campos requeridos/i.test(firstTxt) && /buyer_id/.test(firstTxt)) {
+            console.warn('[createConversation] Fallback remoto exige buyer_id/seller_id; ya enviados; respuesta:', firstTxt)
+          } else if (convResp.status === 400) {
+            console.warn('[createConversation] Reintentando creación con cuerpo mínimo product_id. Motivo:', firstTxt)
+            const convAttemptBody2 = { product_id: productId || null }
+            convResp = await fetch(`${API_BASE}/conversations`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(convAttemptBody2)
+            })
+          }
+        }
+
         if (!convResp.ok) {
           const txt = await convResp.text()
           throw new Error(`Error creando conversación (fallback): ${convResp.status} ${txt}`)
         }
+
         const convData = await convResp.json()
-        const conversationId = convData.id
+        const conversationId = convData.id || convData?.[0]?.id || convData // algunos backends devuelven objeto o array o UUID directo
 
-        // Paso B: añadir participante actual (requerido para poder añadir al otro)
-        const selfPartResp = await fetch(`${API_BASE}/conversation_participants`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ conversation_id: conversationId, user_id: currentUserId })
-        })
-        if (!selfPartResp.ok) {
-          const txt = await selfPartResp.text()
-          console.error('[createConversation] Fallo añadiendo participante propio', { status: selfPartResp.status, txt })
-          throw new Error('Error al añadir participante (propio)')
+        // Insertar participantes si no están ya presentes (según esquema local)
+        const participantsInsert = async (uid: string) => {
+          const resp = await fetch(`${API_BASE}/conversation_participants`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ conversation_id: conversationId, user_id: uid })
+          })
+          if (!resp.ok) {
+            const t = await resp.text()
+            console.warn('[createConversation] Fallo insert participant', { uid, status: resp.status, t })
+          }
         }
 
-        // Paso C: añadir participante destino (permitido porque ya somos participantes)
-        const otherPartResp = await fetch(`${API_BASE}/conversation_participants`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ conversation_id: conversationId, user_id: participantId })
-        })
-        if (!otherPartResp.ok) {
-          const txt = await otherPartResp.text()
-          console.warn('[createConversation] Fallo añadiendo segundo participante; la conversación queda con un solo usuario', { status: otherPartResp.status, txt })
+        // Intentar inserts (pueden fallar si backend remoto ya maneja participantes)
+        await participantsInsert(currentUserId)
+        if (participantId !== currentUserId) {
+          await participantsInsert(participantId)
         }
 
-        // Paso D: mensaje inicial (opcional)
+        // Mensaje inicial
         if (initialMessage) {
           const msgResp = await fetch(`${API_BASE}/messages`, {
             method: 'POST',
