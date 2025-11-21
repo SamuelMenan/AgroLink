@@ -31,6 +31,7 @@
     { "source": "/api/proxy/api/v1/utils/warm", "destination": "/api/utils?action=warm" },
     { "source": "/api/proxy/api/v1/utils/status", "destination": "/api/utils?action=status" },
     
+    { "source": "/api/proxy/api/v1/rpc/(.*)", "destination": "/api/rpc/$1" },
     { "source": "/api/proxy/api/v1/conversations", "destination": "/api/conversations" },
     { "source": "/api/proxy/api/v1/conversations/(.*)", "destination": "/api/conversations/$1" },
     { "source": "/api/proxy/api/v1/conversations/(.*)/messages", "destination": "/api/conversations/$1/messages" },

@@ -26,6 +26,7 @@ export default async function handler(req, res) {
       url: req.url,
       origin: req.headers.origin,
       userAgent: req.headers['user-agent'],
+      clientRequestId: req.headers['x-client-request-id'] || null,
       timestamp: new Date().toISOString()
     })
   }

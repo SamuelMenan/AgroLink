@@ -11,6 +11,7 @@ import {
   QUICK_RESPONSES
 } from '../types/messaging'
 import { getAccessToken } from './apiAuth'
+import { apiClient } from './apiClient'
 import { checkAuthStatus } from '../utils/authFixHelper'
 
 // API Base URL - Use backend proxy to avoid RLS issues
@@ -85,7 +86,8 @@ export async function createConversation(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'x-client-request-id': Math.random().toString(36).slice(2)
       },
       body: JSON.stringify({
         product_id: productId || null,
@@ -115,26 +117,34 @@ export async function createConversation(
         })
 
         // Si falla porque faltan campos requeridos distintos, reintentar con solo product_id
+        let firstTxt: string | null = null
         if (!convResp.ok) {
-          const firstTxt = await convResp.text()
+          firstTxt = await convResp.text()
           if (convResp.status === 400 && /Faltan campos requeridos/i.test(firstTxt) && /buyer_id/.test(firstTxt)) {
             console.warn('[createConversation] Fallback remoto exige buyer_id/seller_id; ya enviados; respuesta:', firstTxt)
           } else if (convResp.status === 400) {
             console.warn('[createConversation] Reintentando creación con cuerpo mínimo product_id. Motivo:', firstTxt)
             const convAttemptBody2 = { product_id: productId || null }
-            convResp = await fetch(`${API_BASE}/conversations`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(convAttemptBody2)
-            })
+            // Use apiClient to benefit from timeouts and retries
+            try {
+              const convData = await apiClient.post<any>(`/api/v1/conversations`, convAttemptBody2)
+              // Simulate a Response-ok path using data
+              return {
+                id: convData.id || convData?.[0]?.id,
+                product_id: productId || null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                participants: [currentUserId, participantId]
+              } as unknown as Conversation
+            } catch (e) {
+              // If apiClient post failed, keep previous flow and let error handling continue
+            }
+            firstTxt = null
           }
         }
 
         if (!convResp.ok) {
-          const txt = await convResp.text()
+          const txt = firstTxt ?? await convResp.text()
           throw new Error(`Error creando conversación (fallback): ${convResp.status} ${txt}`)
         }
 
@@ -169,7 +179,8 @@ export async function createConversation(
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token}`,
+              'x-client-request-id': Math.random().toString(36).slice(2)
             },
             body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage })
           })
@@ -301,6 +312,11 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 
   console.log('[getConversations] Obteniendo conversaciones para usuario:', userId)
 
+  try {
+    return await apiClient.get<Conversation[]>(`/api/v1/conversations?user_id=${userId}`)
+  } catch (e) {
+    // Fallback a fetch directo para mantener el manejo de errores detallado actual
+  }
   const response = await fetch(`${API_BASE}/conversations?user_id=${userId}`, {
     headers: {
       'Authorization': `Bearer ${token}`
@@ -350,6 +366,12 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 
   console.log('[getMessages] Obteniendo mensajes para conversación:', conversationId)
 
+  // Use apiClient for GET with retries/timeouts
+  try {
+    return await apiClient.get<Message[]>(`/api/v1/conversations?action=messages&id=${conversationId}`)
+  } catch (e) {
+    // Fallback to direct fetch to preserve existing error mapping
+  }
   const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     headers: {
       'Authorization': `Bearer ${token}`
@@ -414,7 +436,8 @@ export async function sendMessage(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'x-client-request-id': Math.random().toString(36).slice(2)
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -429,12 +452,35 @@ export async function sendMessage(
   if (!response.ok) {
     const errorText = await response.text()
     let errorData: { error?: string; details?: any; debug?: any } = {}
-    try {
-      errorData = JSON.parse(errorText)
-    } catch {
-      errorData = { error: errorText }
+    try { errorData = JSON.parse(errorText) } catch { errorData = { error: errorText } }
+
+    // If forbidden due to not being a participant, try to add and retry once
+    if (response.status === 403 && /No eres participante/i.test(errorText)) {
+      try {
+        await addParticipant(conversationId, senderId)
+        const retry = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            sender_id: senderId,
+            sender_name: senderName,
+            content,
+            type: 'text',
+            is_from_buyer: isFromBuyer
+          })
+        })
+        if (retry.ok) {
+          return retry.json() as Promise<Message>
+        }
+      } catch (e) {
+        // fall through to error handling
+      }
     }
-    
+
     console.error('[sendMessage] Error response:', {
       status: response.status,
       statusText: response.statusText,
@@ -450,7 +496,7 @@ export async function sendMessage(
       },
       timestamp: new Date().toISOString()
     })
-    
+
     let errorMessage = 'Error al enviar mensaje'
     if (response.status === 403) {
       errorMessage = errorData.debug?.message || 'No tienes permisos para enviar mensajes en esta conversación.'
@@ -463,7 +509,7 @@ export async function sendMessage(
     } else if (errorData.error) {
       errorMessage = errorData.error
     }
-    
+
     throw new Error(errorMessage)
   }
 
