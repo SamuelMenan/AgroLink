@@ -16,6 +16,15 @@
     "api/debug/auth.js": {
       "maxDuration": 30
     },
+    "api/auth/recover-phone.js": {
+      "maxDuration": 30
+    },
+    "api/auth/verify-phone-recovery.js": {
+      "maxDuration": 30
+    },
+    "api/auth/reset-phone-password.js": {
+      "maxDuration": 30
+    },
     "api/rpc.js": {
       "maxDuration": 30
     },
@@ -32,6 +41,9 @@
     { "source": "/api/proxy/api/v1/products-delete", "destination": "/api/products" },
     { "source": "/api/proxy/api/v1/products-update", "destination": "/api/products" },
     { "source": "/api/proxy/api/v1/auth/refresh", "destination": "/api/refresh" },
+    { "source": "/api/proxy/api/v1/auth/recover-phone", "destination": "/api/auth/recover-phone" },
+    { "source": "/api/proxy/api/v1/auth/verify-phone-recovery", "destination": "/api/auth/verify-phone-recovery" },
+    { "source": "/api/proxy/api/v1/auth/reset-phone-password", "destination": "/api/auth/reset-phone-password" },
     
     { "source": "/api/proxy/api/v1/utils/health", "destination": "/api/utils?action=health" },
     { "source": "/api/proxy/api/v1/utils/warm", "destination": "/api/utils?action=warm" },
