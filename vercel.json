@@ -18,8 +18,7 @@
     },
     "api/rpc.js": {
       "maxDuration": 30
-    },
-
+    }
   },
   "rewrites": [
     { "source": "/api/proxy/api/v1/notifications/by-user/(.*)", "destination": "/api/notifications?user_id=$1" },
