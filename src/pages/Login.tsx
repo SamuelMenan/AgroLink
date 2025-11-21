@@ -21,6 +21,7 @@ export default function Login() {
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/simple'
   const intent = params.get('intent')
+  const messagingRedirect = intent === 'messaging'
 
   // URL absoluta a donde queremos ir después de login
   const redirectAbs = useMemo(() => {
@@ -55,7 +56,15 @@ export default function Login() {
       }
       // Persistencia: se guarda preferencia (placeholder UI). Implementación avanzada: custom storage por sesión.
       localStorage.setItem('agrolink_remember', remember ? '1' : '0')
-      navigate(nextParam || '/simple', { replace: true })
+      
+      // Check if there's a redirect URL stored (from messaging or other protected actions)
+      const redirectAfterLogin = localStorage.getItem('redirect_after_login')
+      if (redirectAfterLogin) {
+        localStorage.removeItem('redirect_after_login')
+        window.location.href = redirectAfterLogin
+      } else {
+        navigate(nextParam || '/simple', { replace: true })
+      }
     } finally {
       setSubmitting(false)
     }
@@ -71,6 +80,11 @@ export default function Login() {
         {intent === 'publish' && (
           <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
             Inicia sesión para publicar tu producto. Te llevaremos a la página de publicación al entrar.
+          </div>
+        )}
+        {messagingRedirect && (
+          <div className="mx-6 mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+            Necesitas iniciar sesión para enviar mensajes. Por favor, autentícate para continuar.
           </div>
         )}
         <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">

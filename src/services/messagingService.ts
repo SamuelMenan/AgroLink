@@ -11,6 +11,7 @@ import {
   QUICK_RESPONSES
 } from '../types/messaging'
 import { getAccessToken } from './apiAuth'
+import { checkAuthStatus } from '../utils/authFixHelper'
 
 // API Base URL - Use backend proxy to avoid RLS issues
 const API_BASE = '/api/proxy/api/v1'
@@ -52,6 +53,17 @@ export async function createConversation(
     const token = getAccessToken()
     if (!token) {
       throw new Error('No autenticado')
+    }
+    
+    // Check if user has anonymous token and redirect to login
+    const authStatus = checkAuthStatus()
+    if (!authStatus.isValid || authStatus.role === 'anon') {
+      console.warn('[Messaging] Usuario anónimo detectado, redirigiendo a login')
+      // Store current location to redirect back after login
+      localStorage.setItem('redirect_after_login', window.location.href)
+      // Redirect to login
+      window.location.href = '/login?intent=messaging'
+      throw new Error('Por favor, inicia sesión para enviar mensajes')
     }
     
     // Decode JWT to get user ID
