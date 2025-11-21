@@ -51,7 +51,7 @@ export default function AccountPrivacy(){
       try {
         const patch = {
           full_name: (debouncedProfile.full_name ?? '').replace(/^\s+/, ''),
-          email: debouncedProfile.email ?? '',
+          email: (debouncedProfile.email ?? '').replace(/^\s+/, ''),
           phone: debouncedProfile.phone ?? '',
           address: debouncedProfile.address ?? '',
           name_visibility: debouncedProfile.name_visibility,
@@ -122,7 +122,7 @@ export default function AccountPrivacy(){
           </div>
           <div>
             <label className="block text-sm text-gray-600">Correo</label>
-            <input type="email" value={profile?.email ?? ''} onChange={(e)=> onChange('email', e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+            <input type="email" value={profile?.email ?? ''} onChange={(e)=> onChange('email', e.target.value.replace(/^\s+/, ''))} className="mt-1 w-full rounded border px-3 py-2" />
             <VisibilitySelect label="Visibilidad del correo" value={profile?.email_visibility ?? 'contacts'} onChange={(v)=> onChange('email_visibility', v)} />
           </div>
           <div>
