@@ -12,8 +12,8 @@ import {
 } from '../types/messaging'
 import { getAccessToken } from './apiAuth'
 
-// API Base URL
-const API_BASE = '/api'
+// API Base URL - Use backend proxy to avoid RLS issues
+const API_BASE = '/api/proxy/api/v1'
 
 // Create a new conversation
 export async function createConversation(
