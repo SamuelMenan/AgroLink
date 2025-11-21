@@ -200,7 +200,7 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 
   console.log('[getMessages] Obteniendo mensajes para conversación:', conversationId)
 
-  const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -219,7 +219,7 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
       status: response.status,
       statusText: response.statusText,
       errorData,
-      url: `${API_BASE}/conversations/${conversationId}/messages`
+      url: `${API_BASE}/conversations?action=messages&id=${conversationId}`
     })
     
     let errorMessage = 'Error al obtener mensajes'
@@ -260,7 +260,7 @@ export async function sendMessage(
     isFromBuyer
   })
 
-  const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -289,7 +289,7 @@ export async function sendMessage(
       status: response.status,
       statusText: response.statusText,
       errorData,
-      url: `${API_BASE}/conversations/${conversationId}/messages`,
+      url: `${API_BASE}/conversations?action=messages&id=${conversationId}`,
       requestData: {
         conversation_id: conversationId,
         sender_id: senderId,
@@ -332,7 +332,7 @@ export async function sendQuickRequest(
 
   const content = customMessage || request.message
   
-  const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -369,7 +369,7 @@ export async function sendQuickResponse(
     throw new Error('Tipo de respuesta no válido')
   }
 
-  const responseData = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+  const responseData = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -518,7 +518,7 @@ export async function sendPurchaseStep(
     payment_method?: PaymentMethod
   }
 ): Promise<Message> {
-  const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+  const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -548,7 +548,7 @@ export async function sendPurchaseStep(
 
 // Mark messages as read
 export async function markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/conversations/${conversationId}/mark-read`, {
+  const response = await fetch(`${API_BASE}/conversations?action=mark-read&id=${conversationId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
