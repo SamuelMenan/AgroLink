@@ -512,10 +512,60 @@ export default async function handler(req, res) {
             })
           }
           
-          // Ensure we always return an array, even if response is malformed
+          // Enrich messages with sender names
           const messagesArray = Array.isArray(raw) ? raw : []
-          console.log('[conversations] Returning messages:', messagesArray.length)
-          return res.status(200).json(messagesArray)
+          const enriched = await Promise.all(messagesArray.map(async (message) => {
+            let senderName = null
+            
+            // Try to get sender name from user_profiles or auth.users
+            if (message.sender_id) {
+              try {
+                // First try user_profiles
+                const profileResp = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?user_id=eq.${message.sender_id}&select=full_name`, {
+                  headers: { 
+                    'apikey': SUPABASE_ANON_KEY, 
+                    'Authorization': `Bearer ${userToken}`, 
+                    'Content-Type': 'application/json'
+                  }
+                })
+                
+                if (profileResp.ok) {
+                  const profiles = await profileResp.json()
+                  if (profiles && profiles.length > 0 && profiles[0].full_name) {
+                    senderName = profiles[0].full_name
+                  }
+                }
+                
+                // If not found in profiles, try the get_user_info function
+                if (!senderName) {
+                  const userInfoResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_user_info?user_id=eq.${message.sender_id}`, {
+                    headers: { 
+                      'apikey': SUPABASE_ANON_KEY, 
+                      'Authorization': `Bearer ${userToken}`, 
+                      'Content-Type': 'application/json'
+                    }
+                  })
+                  
+                  if (userInfoResp.ok) {
+                    const userInfo = await userInfoResp.json()
+                    if (userInfo && userInfo.length > 0 && userInfo[0].full_name) {
+                      senderName = userInfo[0].full_name
+                    }
+                  }
+                }
+              } catch (enrichmentError) {
+                console.warn(`[conversations] Failed to enrich sender name for message ${message.id}:`, enrichmentError.message)
+              }
+            }
+            
+            return {
+              ...message,
+              sender_name: senderName
+            }
+          }))
+          
+          console.log('[conversations] Returning enriched messages:', enriched.length)
+          return res.status(200).json(enriched)
         } catch (error) {
           console.error('[conversations] Error in messages action:', error)
           return res.status(500).json({ error: 'Error interno al obtener mensajes', details: error.message })
