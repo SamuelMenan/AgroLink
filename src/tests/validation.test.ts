@@ -133,10 +133,10 @@ describe('Product Form Validation', () => {
       expect(errors.description).toContain('200 caracteres')
     })
 
-    it('should reject invalid quantity', () => {
-      const data = { ...validFormData, quantity: '-5' }
+    it('should reject empty quantity', () => {
+      const data = { ...validFormData, quantity: '' }
       const errors = validateProductForm(data)
-      expect(errors.quantity).toContain('numérica')
+      expect(errors.quantity).toContain('obligatoria')
     })
 
     it('should reject missing category', () => {

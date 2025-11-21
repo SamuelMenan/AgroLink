@@ -1,5 +1,6 @@
 // Vitest setup file
 import { vi } from 'vitest'
+import '@testing-library/jest-dom'
 
 // Mock navigator.geolocation
 Object.defineProperty(globalThis, 'navigator', {
@@ -20,13 +21,9 @@ Object.defineProperty(globalThis, 'navigator', {
 })
 
 // Mock document.execCommand for RichTextEditor
-Object.defineProperty(globalThis, 'document', {
-  value: {
-    ...globalThis.document,
-    execCommand: vi.fn()
-  },
-  writable: true
-})
+if (typeof document !== 'undefined') {
+  document.execCommand = vi.fn()
+}
 
 // Mock URL constructor and its methods
 class MockURL {
@@ -78,6 +75,8 @@ Object.defineProperty(globalThis, 'URL', {
 
 // Mock URLSearchParams
 class MockURLSearchParams {
+  private params: Map<string, string>;
+  
   constructor(init?: string | string[][] | Record<string, string>) {
     this.params = new Map();
     if (typeof init === 'string') {
@@ -92,8 +91,6 @@ class MockURLSearchParams {
       Object.entries(init).forEach(([key, value]) => this.params.set(key, value));
     }
   }
-  
-  private params: Map<string, string>;
   
   get(name: string): string | null {
     return this.params.get(name) || null;

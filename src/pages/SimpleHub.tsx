@@ -10,7 +10,7 @@ export default function SimpleHub() {
       </header>
 
       <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-    <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Habla con tus compradores" />
+
         <BigButton to="/dashboard/products/new" icon="add_circle" title="Publicar producto" subtitle="Publica fácil y rápido" />
         <BigButton to="/dashboard/products" icon="inventory_2" title="Mis publicaciones" subtitle="Edita o elimina" />
   { /* Mensajes ya está arriba; eliminamos duplicado */ }

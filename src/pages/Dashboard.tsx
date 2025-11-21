@@ -1,5 +1,3 @@
-import MessagesWidget from '../components/MessagesWidget'
-
 export default function Dashboard() {
   return (
     <main className="mx-auto max-w-7xl p-4">
@@ -21,17 +19,10 @@ export default function Dashboard() {
           <h2 className="font-semibold">Catálogo</h2>
           <p className="text-sm text-gray-600">Sincroniza y mejora la información de todos tus productos.</p>
         </a>
-        <a href="/messages" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-          <h2 className="font-semibold">Mensajes</h2>
-          <p className="text-sm text-gray-600">Chatea directamente con compradores y vendedores.</p>
-        </a>
         <a href="/dashboard/settings" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
           <h2 className="font-semibold">Configuración</h2>
           <p className="text-sm text-gray-600">Perfil y privacidad de tu cuenta.</p>
         </a>
-        <div className="md:col-span-3">
-          <MessagesWidget />
-        </div>
       </div>
     </main>
   )
