@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import AssistantGuide from '../components/AssistantGuide'
 
 export default function SimpleHub() {
   return (
@@ -32,7 +31,7 @@ export default function SimpleHub() {
         </ol>
       </section>
 
-      <AssistantGuide />
+      
     </main>
   )
 }
