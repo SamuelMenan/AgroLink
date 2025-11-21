@@ -14,7 +14,7 @@ describe('Product Form Validation', () => {
     pricePerKilo: '',
     department: '52',
     municipality: '52019',
-    condition: 'new',
+    condition: 'fresh',
     stockAvailable: true,
     detailedDescription: '<p>Descripción detallada</p>',
     location: 'Ipiales, Nariño'
@@ -91,7 +91,7 @@ describe('Product Form Validation', () => {
 
   describe('Product Condition Validation', () => {
     it('should accept valid conditions', () => {
-      const conditions: Array<'new' | 'used' | 'seasonal'> = ['new', 'used', 'seasonal']
+      const conditions: Array<'fresh' | 'organic' | 'conventional'> = ['fresh', 'organic', 'conventional']
       conditions.forEach(condition => {
         const data = { ...validFormData, condition }
         const errors = validateProductForm(data)
