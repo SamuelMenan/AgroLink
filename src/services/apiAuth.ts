@@ -422,6 +422,77 @@ export async function refreshSession() {
 
 export function signOut() { clearTokens(); }
 
+// Funciones para recuperación de contraseña por teléfono
+export async function requestPhoneRecoveryToken(phone: string) {
+  try {
+    const body = { phone: phone.trim() }
+    const resp = await post(`${AUTH_PREFIX}/recover-phone`, body)
+    return resp
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error al solicitar recuperación'
+    
+    // Manejar errores específicos
+    if (msg.includes('404')) {
+      throw new Error('No se encontró una cuenta con este número de teléfono.')
+    }
+    if (msg.includes('429')) {
+      throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.')
+    }
+    if (msg.includes('503') || msg.includes('502')) {
+      throw new Error('Servicio temporalmente no disponible. Intenta nuevamente.')
+    }
+    
+    throw new Error('Error al enviar el código SMS. Intenta nuevamente.')
+  }
+}
+
+export async function verifyPhoneRecoveryToken(phone: string, token: string) {
+  try {
+    const body = { phone: phone.trim(), token: token.trim() }
+    const resp = await post(`${AUTH_PREFIX}/verify-phone-recovery`, body)
+    return resp
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error al verificar código'
+    
+    // Manejar errores específicos
+    if (msg.includes('400') || msg.includes('401')) {
+      throw new Error('Código inválido o expirado.')
+    }
+    if (msg.includes('404')) {
+      throw new Error('No se encontró una solicitud de recuperación para este número.')
+    }
+    
+    throw new Error('Error al verificar el código. Intenta nuevamente.')
+  }
+}
+
+export async function resetPasswordWithPhone(phone: string, token: string, newPassword: string) {
+  try {
+    const body = { 
+      phone: phone.trim(), 
+      token: token.trim(), 
+      password: newPassword 
+    }
+    const resp = await post(`${AUTH_PREFIX}/reset-phone-password`, body)
+    return resp
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error al restablecer contraseña'
+    
+    // Manejar errores específicos
+    if (msg.includes('400')) {
+      throw new Error('La contraseña no cumple con los requisitos de seguridad.')
+    }
+    if (msg.includes('401')) {
+      throw new Error('El código de verificación ha expirado.')
+    }
+    if (msg.includes('404')) {
+      throw new Error('No se encontró una solicitud de recuperación válida.')
+    }
+    
+    throw new Error('Error al restablecer la contraseña. Intenta nuevamente.')
+  }
+}
+
 // Determinar backend base URL
 const resolveBaseUrl = () => {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';

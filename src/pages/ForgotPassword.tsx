@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function ForgotPassword() {
+  const navigate = useNavigate()
   const { resetPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -34,6 +36,18 @@ export default function ForgotPassword() {
         {msg && <p className="text-sm text-green-700">{msg}</p>}
         <button disabled={submitting} type="submit" className="w-full rounded-md bg-green-600 px-4 py-2.5 font-medium text-white shadow hover:bg-green-700 disabled:opacity-60">{submitting ? 'Enviando…' : 'Enviar enlace'}</button>
       </form>
+      <div className="mt-6 text-center">
+        <p className="text-sm text-gray-600">
+          ¿Prefieres recuperar por SMS?{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/phone-recovery')}
+            className="text-green-700 hover:text-green-800 font-medium"
+          >
+            Usar número de teléfono
+          </button>
+        </p>
+      </div>
     </main>
   )
 }

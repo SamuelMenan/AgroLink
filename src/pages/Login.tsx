@@ -139,11 +139,19 @@ export default function Login() {
               />
               Recordar sesión
             </label>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <a
               className="text-sm font-medium text-green-700 hover:text-green-800 hover:underline"
               href="/forgot-password"
             >
               ¿Olvidaste tu contraseña?
+            </a>
+            <a
+              className="text-sm font-medium text-green-700 hover:text-green-800 hover:underline"
+              href="/phone-recovery"
+            >
+              Recuperar por SMS
             </a>
           </div>
           {formError && <p className="text-sm text-red-600">{formError}</p>}
