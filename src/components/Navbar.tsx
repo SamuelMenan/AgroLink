@@ -62,6 +62,9 @@ export default function Navbar() {
                   </div>
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[180px] truncate">{user.full_name || user.email}</span>
                 </div>
+                <NavLink to="/dashboard/settings" className={navItemClass}>
+                  Configuración
+                </NavLink>
                 <button
                   onClick={async () => { await signOut() }}
                   className="px-3 py-2 rounded-md text-sm font-medium border border-red-600 text-red-700 hover:bg-red-600 hover:text-white"
@@ -73,6 +76,9 @@ export default function Navbar() {
               <>
                 <NavLink to="/login" className={navItemClass}>
                   Iniciar sesión
+                </NavLink>
+                <NavLink to="/dashboard/settings" className={navItemClass}>
+                  Configuración
                 </NavLink>
                 <NavLink to="/register" className={({ isActive }) =>
                   `px-3 py-2 rounded-md text-sm font-medium border ${isActive ? 'bg-green-700 text-white border-green-700' : 'border-green-600 text-green-700 hover:bg-green-600 hover:text-white'}`
