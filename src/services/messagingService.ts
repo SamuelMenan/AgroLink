@@ -10,6 +10,7 @@ import {
   QUICK_REQUESTS,
   QUICK_RESPONSES
 } from '../types/messaging'
+import { getAccessToken } from './apiAuth'
 
 // API Base URL
 const API_BASE = '/api'
@@ -48,7 +49,7 @@ export async function createConversation(
     const { participantId, productId, initialMessage } = buyerIdOrParams
     
     // Get current user ID from token (stored as 'agrolink_access_token')
-    const token = localStorage.getItem('agrolink_access_token')
+    const token = getAccessToken()
     if (!token) {
       throw new Error('No autenticado')
     }
@@ -101,7 +102,7 @@ export async function createConversation(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({
       buyer_id: buyerIdOrParams,
@@ -123,7 +124,7 @@ export async function createConversation(
 export async function getConversations(userId: string): Promise<Conversation[]> {
   const response = await fetch(`${API_BASE}/conversations?user_id=${userId}`, {
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     }
   })
 
@@ -138,7 +139,7 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
 export async function getMessages(conversationId: string): Promise<Message[]> {
   const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     }
   })
 
@@ -161,7 +162,7 @@ export async function sendMessage(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -199,7 +200,7 @@ export async function sendQuickRequest(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -236,7 +237,7 @@ export async function sendQuickResponse(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -265,7 +266,7 @@ export async function updateConversationStatus(
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({ status })
   })
@@ -290,7 +291,7 @@ export async function createPurchaseAgreement(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -316,7 +317,7 @@ export async function confirmPurchaseAgreement(agreementId: string): Promise<Com
   const response = await fetch(`${API_BASE}/purchase-agreements/${agreementId}/confirm`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     }
   })
 
@@ -338,7 +339,7 @@ export async function uploadPaymentProof(
   const response = await fetch(`${API_BASE}/purchase-agreements/${agreementId}/payment-proof`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: formData
   })
@@ -355,7 +356,7 @@ export async function completePayment(agreementId: string): Promise<CompraAcuerd
   const response = await fetch(`${API_BASE}/purchase-agreements/${agreementId}/complete-payment`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     }
   })
 
@@ -384,7 +385,7 @@ export async function sendPurchaseStep(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({
       conversation_id: conversationId,
@@ -414,7 +415,7 @@ export async function markMessagesAsRead(conversationId: string, userId: string)
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
     body: JSON.stringify({ user_id: userId })
   })
