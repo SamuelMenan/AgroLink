@@ -1,25 +1,38 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PRODUCT_CATEGORIES, type Product } from '../types/product'
+import { type Product } from '../types/product'
 import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
 import { contactUser } from '../services/messagingService'
 import { offlineQueue } from '../services/offlineQueue'
+import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
 
 export default function Products() {
-  const [q, setQ] = useState('')
-  const [category, setCategory] = useState<string>('')
-  const [locationText, setLocationText] = useState('')
-  const [distanceKm, setDistanceKm] = useState<string>('')
-  const [coords, setCoords] = useState<{lat:number,lng:number}|null>(null)
-  const [sort, setSort] = useState<SearchFilters['sort']>('relevance')
+  const [enhancedFilters, setEnhancedFilters] = useState<EnhancedSearchFilters>({
+    q: '',
+    category: '',
+    locationText: '',
+    distanceKm: '',
+    minPrice: '',
+    maxPrice: '',
+    certifications: [],
+    season: '',
+    sort: 'relevance'
+  })
+  const [coords] = useState<{lat:number,lng:number}|null>(null)
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<Product[]>([])
   const [error, setError] = useState<string|null>(null)
   const [offlineStatus, setOfflineStatus] = useState<{isOffline: boolean, queueSize: number}>({ isOffline: false, queueSize: 0 })
 
-  const filtersRaw = useMemo(() => ({ q, category, locationText, distanceKm, sort }), [q, category, locationText, distanceKm, sort])
+  const filtersRaw = useMemo(() => ({ 
+    q: enhancedFilters.q, 
+    category: enhancedFilters.category, 
+    locationText: enhancedFilters.locationText, 
+    distanceKm: enhancedFilters.distanceKm, 
+    sort: enhancedFilters.sort 
+  }), [enhancedFilters])
   const debounced = useDebouncedValue(filtersRaw, 350)
 
   useEffect(()=>{
@@ -66,6 +79,12 @@ export default function Products() {
           userLng: coords?.lng,
           sort: debounced.sort,
           limit: 60,
+          // Add enhanced filters support when backend is ready
+          // TODO: Implement backend support for enhanced filters
+          // minPrice: enhancedFilters.minPrice ? Number(enhancedFilters.minPrice) : undefined,
+          // maxPrice: enhancedFilters.maxPrice ? Number(enhancedFilters.maxPrice) : undefined,
+          // certifications: enhancedFilters.certifications.length > 0 ? enhancedFilters.certifications : undefined,
+          // season: enhancedFilters.season || undefined
         }
         const res = await listPublicProducts(filters)
         if (!alive) return
@@ -81,40 +100,27 @@ export default function Products() {
     return ()=>{ alive = false }
   }, [debounced, coords])
 
-  function useMyLocation(){
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition((pos)=>{
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-    })
+  const handleFiltersChange = (newFilters: EnhancedSearchFilters) => {
+    setEnhancedFilters(newFilters)
+  }
+
+  const handleSearch = (filters: EnhancedSearchFilters) => {
+    // Search is handled automatically through the debounced effect
+    console.log('Search triggered with filters:', filters)
   }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10">
       <h1 className="text-2xl font-bold text-green-800">Buscar productos</h1>
 
-      {/* Filtros */}
-      <section className="mt-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Buscar por nombre o descripción" className="rounded-lg border border-gray-300/90 px-3 py-2 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
-          <select value={category} onChange={(e)=>setCategory(e.target.value)} className="rounded-lg border border-gray-300/90 px-3 py-2 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20">
-            <option value="">Todas las categorías</option>
-            {PRODUCT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <input value={locationText} onChange={(e)=>setLocationText(e.target.value)} placeholder="Ubicación (ciudad/municipio)" className="rounded-lg border border-gray-300/90 px-3 py-2 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
-          <div className="flex gap-2">
-            <input value={distanceKm} onChange={(e)=>setDistanceKm(e.target.value)} inputMode="numeric" placeholder="Distancia (km)" className="w-full rounded-lg border border-gray-300/90 px-3 py-2 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
-            <button type="button" onClick={useMyLocation} className="shrink-0 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Mi ubicación</button>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-sm text-gray-600">{coords ? 'Ubicación establecida' : 'Puedes usar tu ubicación para filtrar por distancia'}</p>
-          <select value={sort} onChange={(e)=>setSort(e.target.value as SearchFilters['sort'])} className="rounded-lg border border-gray-300/90 px-3 py-2 text-sm outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20">
-            <option value="relevance">Ordenar por: relevancia</option>
-            <option value="price-asc">Precio: menor a mayor</option>
-            <option value="price-desc">Precio: mayor a menor</option>
-            <option value="distance">Distancia</option>
-          </select>
-        </div>
+      {/* Enhanced Search Component */}
+      <section className="mt-5">
+        <EnhancedSearch
+          filters={enhancedFilters}
+          onFiltersChange={handleFiltersChange}
+          onSearch={handleSearch}
+          showAdvancedFilters={true}
+        />
       </section>
 
       {/* Resultados */}

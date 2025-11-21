@@ -3,8 +3,12 @@ import ImageUploader from './ImageUploader'
 import RichTextEditor from './RichTextEditor'
 import ProductPreview from './ProductPreview'
 import { PRODUCT_CATEGORIES } from '../types/product'
-import { DEPARTMENTS, MUNICIPALITIES, getMunicipalitiesByDepartment, type Municipality } from '../services/locationService'
+import { DEPARTMENTS } from '../services/locationService'
 import { validateProductForm } from '../utils/validation'
+import { ValidatedInput, ValidatedTextArea } from '../hooks/useValidation.tsx'
+import { VALIDATION_RULES } from '../utils/inputValidation'
+import { formatAgriculturalQuantity } from '../utils/agriculturalUnits'
+import { AgriculturalTerm } from './GlossaryTooltip'
 
 export type ProductFormValues = {
   name: string
@@ -58,22 +62,13 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
   const [submitting, setSubmitting] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
-  const [availableMunicipalities, setAvailableMunicipalities] = useState<Municipality[]>([])
 
-  // Update municipalities when department changes
+  // Update location when municipality or department changes
   useEffect(() => {
-    if (values.department) {
-      setAvailableMunicipalities(getMunicipalitiesByDepartment(values.department))
-      // Reset municipality if it doesn't belong to the selected department
-      if (values.municipality) {
-        const municipality = MUNICIPALITIES.find(m => m.id === values.municipality)
-        if (municipality?.department_id !== values.department) {
-          setValues(v => ({ ...v, municipality: '' }))
-        }
-      }
-    } else {
-      setAvailableMunicipalities([])
-      setValues(v => ({ ...v, municipality: '' }))
+    if (values.department && values.municipality) {
+      const department = DEPARTMENTS.find(d => d.id === values.department)
+      const locationString = `${values.municipality}, ${department?.name || ''}`
+      setValues(v => ({ ...v, location: locationString }))
     }
   }, [values.department, values.municipality])
 
@@ -114,16 +109,27 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
       <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre del producto</label>
-          <input value={values.name} onChange={(e)=>setValues(v=>({...v,name:e.target.value}))} className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+          <ValidatedInput
+            value={values.name}
+            onChange={(value) => handleInputChange('name', value)}
+            rule={VALIDATION_RULES.productName}
+            placeholder="Ej: Café de especialidad, Arroz orgánico, Plátano verde"
+            className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+            showIcon={true}
+          />
           {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Descripción breve</label>
-          <textarea 
+          <ValidatedTextArea
             value={values.description} 
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            rows={3} 
-            className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" 
+            onChange={(value) => handleInputChange('description', value)}
+            rule={VALIDATION_RULES.productDescription}
+            rows={3}
+            maxLength={200}
+            placeholder="Describe brevemente tu producto agrícola..."
+            className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+            showIcon={true}
           />
           <p className="mt-1 text-xs text-gray-500">Máx. 200 caracteres</p>
           {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
@@ -146,23 +152,27 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700">Precio por unidad (COP)</label>
-              <input 
+              <ValidatedInput
                 value={values.pricePerUnit || ''} 
-                onChange={(e) => handleInputChange('pricePerUnit', e.target.value)}
+                onChange={(value) => handleInputChange('pricePerUnit', value)}
+                rule={VALIDATION_RULES.price}
                 inputMode="decimal" 
                 placeholder="Ej: 500"
-                className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" 
+                className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+                showIcon={true}
               />
               {errors.pricePerUnit && <p className="mt-1 text-sm text-red-600">{errors.pricePerUnit}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Precio por kilo (COP)</label>
-              <input 
+              <ValidatedInput
                 value={values.pricePerKilo || ''} 
-                onChange={(e) => handleInputChange('pricePerKilo', e.target.value)}
+                onChange={(value) => handleInputChange('pricePerKilo', value)}
+                rule={VALIDATION_RULES.price}
                 inputMode="decimal" 
                 placeholder="Ej: 3500"
-                className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" 
+                className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+                showIcon={true}
               />
               {errors.pricePerKilo && <p className="mt-1 text-sm text-red-600">{errors.pricePerKilo}</p>}
             </div>
@@ -170,12 +180,14 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
           {/* Legacy price field for backward compatibility */}
           <div className="mt-3">
             <label className="block text-sm font-medium text-gray-700">Precio general (COP) - Opcional</label>
-            <input 
+            <ValidatedInput
               value={values.price || ''} 
-              onChange={(e) => handleInputChange('price', e.target.value)}
+              onChange={(value) => handleInputChange('price', value)}
+              rule={VALIDATION_RULES.price}
               inputMode="decimal" 
               placeholder="Ej: 1000"
-              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" 
+              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+              showIcon={true}
             />
             {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
           </div>
@@ -184,23 +196,44 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700">Cantidad disponible</label>
-            <input 
+            <ValidatedInput
               value={values.quantity} 
-              onChange={(e) => handleInputChange('quantity', e.target.value)}
+              onChange={(value) => handleInputChange('quantity', value)}
+              rule={VALIDATION_RULES.quantity}
               inputMode="numeric" 
-              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" 
+              placeholder="Ej: 100, 5 fanegas, 20 arrobas"
+              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+              showIcon={true}
             />
+            <p className="mt-1 text-xs text-gray-500">Puedes usar unidades agrícolas: fanegas, arrobas, etc.</p>
             {errors.quantity && <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>}
+            {/* Unit conversion display */}
+            {values.quantity && (
+              <div className="mt-2 p-2 bg-blue-50 rounded-md text-xs text-blue-700">
+                <p className="font-medium">Conversión de unidades:</p>
+                <p>{formatAgriculturalQuantity(values.quantity)}</p>
+              </div>
+            )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Tipo de cultivo</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Tipo de cultivo
+              <AgriculturalTerm term="cultivo">
+                <span className="ml-1 text-xs text-green-600 cursor-help">¿Qué es?</span>
+              </AgriculturalTerm>
+            </label>
             <select 
               value={values.condition || 'fresh'} 
               onChange={(e) => handleInputChange('condition', e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
             >
               <option value="fresh">Fresco (recién cosechado)</option>
-              <option value="organic">Orgánico certificado</option>
+              <option value="organic">
+                Orgánico certificado
+                <AgriculturalTerm term="orgánico">
+                  <span className="ml-1 text-xs text-green-600">ℹ</span>
+                </AgriculturalTerm>
+              </option>
               <option value="conventional">Convencional</option>
             </select>
             {errors.condition && <p className="mt-1 text-sm text-red-600">{errors.condition}</p>}
@@ -259,24 +292,22 @@ export default function ProductForm({ title, initial, onSubmit, submitLabel = 'P
           
           <div>
             <label className="block text-sm font-medium text-gray-700">Municipio</label>
-            <select 
-              value={values.municipality || ''} 
-              onChange={(e) => handleInputChange('municipality', e.target.value)}
-              disabled={!values.department}
-              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              <option value="">{values.department ? 'Selecciona un municipio' : 'Primero selecciona un departamento'}</option>
-              {availableMunicipalities.map(municipality => (
-                <option key={municipality.id} value={municipality.id}>{municipality.name}</option>
-              ))}
-            </select>
+            <ValidatedInput
+              value={values.municipality || ''}
+              onChange={(value) => handleInputChange('municipality', value)}
+              rule={VALIDATION_RULES.location}
+              placeholder="Ej: Armenia, Pereira, Manizales"
+              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+              showIcon={true}
+            />
+            <p className="mt-1 text-xs text-gray-500">Escribe el nombre del municipio donde se encuentra tu producto</p>
             {errors.municipality && <p className="mt-1 text-sm text-red-600">{errors.municipality}</p>}
           </div>
           
           {/* Legacy location field for backward compatibility */}
           <div className="hidden">
             <input 
-              value={`${values.municipality ? MUNICIPALITIES.find(m => m.id === values.municipality)?.name : ''}${values.department ? ', ' + DEPARTMENTS.find(d => d.id === values.department)?.name : ''}`} 
+              value={`${values.municipality || ''}${values.department ? ', ' + DEPARTMENTS.find(d => d.id === values.department)?.name : ''}`} 
               onChange={(e) => handleInputChange('location', e.target.value)}
             />
           </div>
