@@ -20,6 +20,7 @@ import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'
 import OAuthCallback from './pages/OAuthCallback'
+import SupportAssistant from './components/SupportAssistant'
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <SupportAssistant />
     </div>
   )
 }
