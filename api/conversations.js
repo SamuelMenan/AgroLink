@@ -22,7 +22,16 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Supabase no configurado' })
   }
 
-  const authHeader = req.headers.authorization || `Bearer ${SUPABASE_ANON_KEY}`
+  // Verificar que el usuario esté autenticado con un token JWT válido
+  const authHeader = req.headers.authorization
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No autenticado. Se requiere token de usuario.' })
+  }
+
+  const userToken = authHeader.split(' ')[1]
+  if (userToken === SUPABASE_ANON_KEY) {
+    return res.status(401).json({ error: 'Se requiere token de usuario autenticado, no anon key' })
+  }
 
   try {
     if (req.method === 'POST') {
@@ -38,7 +47,7 @@ export default async function handler(req, res) {
       const checkResponse = await fetch(checkUrl, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': authHeader,
+          'Authorization': `Bearer ${userToken}`,
           'Content-Type': 'application/json'
         }
       })
@@ -57,7 +66,7 @@ export default async function handler(req, res) {
                 method: 'POST',
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': authHeader,
+                  'Authorization': `Bearer ${userToken}`,
                   'Content-Type': 'application/json',
                   'Prefer': 'return=minimal'
                 },
@@ -80,7 +89,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': authHeader,
+          'Authorization': `Bearer ${userToken}`,
           'Content-Type': 'application/json',
           'Prefer': 'return=representation'
         },
@@ -107,7 +116,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': authHeader,
+          'Authorization': `Bearer ${userToken}`,
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal'
         },
@@ -124,7 +133,7 @@ export default async function handler(req, res) {
           method: 'POST',
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': authHeader,
+            'Authorization': `Bearer ${userToken}`,
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal'
           },
@@ -153,7 +162,7 @@ export default async function handler(req, res) {
       const response = await fetch(url, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': authHeader,
+          'Authorization': `Bearer ${userToken}`,
           'Content-Type': 'application/json'
         }
       })
