@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ValidatedInput } from '../hooks/useValidation.tsx'
 import { VALIDATION_RULES } from '../utils/inputValidation'
 import { getSearchSuggestions, type SearchSuggestion, SearchHistoryManager } from '../utils/searchHistory'
-import { findGlossaryTerm } from '../utils/agriculturalGlossary'
 import { PRODUCT_CATEGORIES } from '../types/product'
-import { Search, Filter, X, Info, Clock, TrendingUp } from 'lucide-react'
+import { Search, Filter, X, Clock, TrendingUp } from 'lucide-react'
 
 export interface EnhancedSearchFilters {
   q: string
@@ -26,10 +25,10 @@ interface EnhancedSearchProps {
 }
 
 const CERTIFICATION_OPTIONS = [
-  { value: 'organico', label: 'Orgánico', icon: '🌱' },
-  { value: 'fair-trade', label: 'Comercio Justo', icon: '🤝' },
-  { value: 'sin-pesticidas', label: 'Sin Pesticidas', icon: '🚫' },
-  { value: 'certificado', label: 'Certificado', icon: '✅' }
+  { value: 'organico', label: 'Orgánico', icon: 'eco' },
+  { value: 'fair-trade', label: 'Comercio Justo', icon: 'handshake' },
+  { value: 'sin-pesticidas', label: 'Sin Pesticidas', icon: 'block' },
+  { value: 'certificado', label: 'Certificado', icon: 'verified' }
 ]
 
 const SEASON_OPTIONS = [
@@ -44,7 +43,6 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
   const [showFilters, setShowFilters] = useState(false)
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [glossaryTerm, setGlossaryTerm] = useState<ReturnType<typeof findGlossaryTerm> | null>(null)
   const [searchHistory, setSearchHistory] = useState<string[]>([])
 
   // Load search history on mount
@@ -62,10 +60,6 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
 
     const newSuggestions = getSearchSuggestions(query, filters.category)
     setSuggestions(newSuggestions)
-    
-    // Check for glossary terms
-    const term = findGlossaryTerm(query)
-    setGlossaryTerm(term)
   }, [filters.category])
 
   // Debounced suggestion update
@@ -204,25 +198,7 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
                 </div>
               )}
             </div>
-          )}
-
-          {/* Glossary tooltip */}
-          {glossaryTerm && (
-            <div className="absolute z-40 mt-2 w-full max-w-md rounded-lg border border-green-200 bg-green-50 p-3 shadow-lg">
-              <div className="flex items-start gap-2">
-                <Info className="mt-0.5 h-4 w-4 text-green-600" />
-                <div className="flex-1">
-                  <div className="font-medium text-green-900">{glossaryTerm.term}</div>
-                  <div className="mt-1 text-sm text-green-800">{glossaryTerm.definition}</div>
-                  {glossaryTerm.examples && (
-                    <div className="mt-2 text-xs text-green-700">
-                      Ejemplo: {glossaryTerm.examples[0]}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Basic filters row */}
@@ -287,6 +263,16 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
                     Activo
                   </span>
                 )}
+              </button>
+            )}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                title="Limpiar todos los filtros"
+              >
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -354,28 +340,15 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
                         }}
                         className="rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
-                      <span className="text-sm">
-                        {cert.icon} {cert.label}
+                      <span className="flex items-center gap-1 text-sm">
+                        <span className="material-icons-outlined text-[18px]">{cert.icon}</span>
+                        {cert.label}
                       </span>
                     </label>
                   ))}
                 </div>
               </div>
             </div>
-
-            {/* Clear filters button */}
-            {hasActiveFilters && (
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <X className="h-4 w-4" />
-                  Limpiar filtros
-                </button>
-              </div>
-            )}
           </div>
         )}
       </form>
