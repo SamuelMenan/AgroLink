@@ -20,6 +20,7 @@ import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'
 import OAuthCallback from './pages/OAuthCallback'
 import CatalogManagement from './pages/dashboard/CatalogManagement'
+import { Messages } from './pages/Messages'
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/simple" element={<SimpleHub />} />
+          <Route path="/messages" element={<Messages />} />
           <Route path="/dashboard/products" element={<MyProducts />} />
           <Route path="/dashboard/products/new" element={<PublishProduct />} />
           <Route path="/dashboard/products/:id/edit" element={<EditProduct />} />

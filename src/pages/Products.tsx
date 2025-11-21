@@ -4,6 +4,7 @@ import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
+import { createConversation } from '../services/messagingService'
 
 import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
 
@@ -212,21 +213,33 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
   }
 
   async function handleSendMessage() {
-    if (!message.trim() || isSending) return
+    if (!message.trim() || isSending || !user) return
     
     setIsSending(true)
-    console.log(`Sending message to seller ${p.user_id}: ${message}`)
+    setErr(null)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Create or get conversation with the seller for this product
+      await createConversation({
+        participantId: p.user_id,
+        productId: p.id,
+        initialMessage: message
+      })
+      
+      // Navigate to messages page with the conversation selected
+      window.location.href = '/messages'
+      
+      // Close modal and reset form
       setMessageSent(true)
       setTimeout(() => {
         setMessageSent(false)
         setIsMessageModalOpen(false)
         setMessage('Hola. ¿Sigue estando disponible?')
-      }, 2000)
-    } catch {
-      setErr('Error al enviar el mensaje')
+      }, 1000)
+      
+    } catch (error) {
+      console.error('Error creating conversation:', error)
+      setErr('Error al enviar el mensaje. Por favor intenta de nuevo.')
     } finally {
       setIsSending(false)
     }
