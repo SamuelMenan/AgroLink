@@ -245,8 +245,8 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
         // TODO: Implement proper messaging integration when messaging system is ready
         setTimeout(() => {
           setMsgSent(true)
+          setSendingMsg(false)
         }, 1000);
-        setMsgSent(true)
         return // Success
         
       } catch (e) {

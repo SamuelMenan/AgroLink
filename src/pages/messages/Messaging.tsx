@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMessaging } from '../../context/MessagingContext';
 import type { Conversation } from '../../types/messaging';
 import { Send, Search, Archive, UserPlus, ChevronLeft, MoreVertical } from 'lucide-react';
 
 export default function Messaging() {
+  const [searchParams] = useSearchParams();
   const { 
     state, 
     sendMessage, 
@@ -16,13 +18,34 @@ export default function Messaging() {
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load conversations on mount
+  // Load conversations on mount and handle URL parameter
   useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+    const loadInitialData = async () => {
+      try {
+        await loadConversations();
+        
+        // Check if we need to open a specific conversation from URL
+        const userId = searchParams.get('with');
+        if (userId && state.conversations.length > 0) {
+          const conversation = state.conversations.find(conv => 
+            conv.participants.some(p => p.userId === userId)
+          );
+          if (conversation) {
+            setActiveConversation(conversation);
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load conversations');
+        console.error('Error loading conversations:', err);
+      }
+    };
+    
+    loadInitialData();
+  }, [loadConversations, searchParams, state.conversations, setActiveConversation]);
 
   // Load messages when conversation is selected
   useEffect(() => {
@@ -62,6 +85,9 @@ export default function Messaging() {
       messageInputRef.current?.focus();
     } catch (error) {
       console.error('Failed to send message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send message');
+      // Clear error after 5 seconds
+      setTimeout(() => setError(null), 5000);
     }
   };
 
@@ -101,6 +127,26 @@ export default function Messaging() {
     conversation.lastMessage?.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-600 mb-2">Error al cargar mensajes</div>
+          <div className="text-sm text-gray-600 mb-4">{error}</div>
+          <button 
+            onClick={() => {
+              setError(null);
+              loadConversations();
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (state.loading && state.conversations.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -126,6 +172,12 @@ export default function Messaging() {
               <Search className="h-5 w-5" />
             </button>
           </div>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="text-sm text-red-600">{error}</div>
+            </div>
+          )}
           
           {showSearch && (
             <div className="relative">
@@ -261,6 +313,15 @@ export default function Messaging() {
                       message.senderId === state.currentUserId ? 'text-green-100' : 'text-gray-500'
                     }`}>
                       {formatTime(message.createdAt)}
+                      {message.senderId === state.currentUserId && (
+                        <span className="ml-1">
+                          {message.status === 'sending' && '⏳'}
+                          {message.status === 'sent' && '✓'}
+                          {message.status === 'delivered' && '✓✓'}
+                          {message.status === 'read' && '✓✓'}
+                          {message.status === 'failed' && '❌'}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>

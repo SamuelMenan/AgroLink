@@ -12,7 +12,7 @@ import type {
 
 interface MessagingContextType {
   state: MessagingState;
-  sendMessage: (request: SendMessageRequest) => Promise<void>;
+  sendMessage: (request: SendMessageRequest) => Promise<Message>;
   createConversation: (request: CreateConversationRequest) => Promise<Conversation>;
   loadConversations: (page?: number) => Promise<void>;
   loadMessages: (conversationId: string, page?: number) => Promise<void>;
@@ -212,16 +212,44 @@ export function MessagingProvider({ children }: { children: React.ReactNode }) {
   const sendMessage = async (request: SendMessageRequest) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const message = await messagingService.sendMessage(request);
+      
+      // Optimistically add message to UI
+      const tempMessage: Message = {
+        id: `temp-${Date.now()}`,
+        conversationId: request.conversationId,
+        senderId: state.currentUserId,
+        content: request.content,
+        createdAt: new Date().toISOString(),
+        status: 'sending',
+        readAt: undefined
+      };
+      
       dispatch({ 
         type: 'ADD_MESSAGE', 
+        payload: { conversationId: request.conversationId, message: tempMessage } 
+      });
+      
+      const message = await messagingService.sendMessage(request);
+      
+      // Replace temp message with real one
+      dispatch({ 
+        type: 'UPDATE_MESSAGE', 
         payload: { conversationId: request.conversationId, message } 
       });
+      
+      return message;
     } catch (error) {
       dispatch({ 
         type: 'SET_ERROR', 
         payload: error instanceof Error ? error.message : 'Failed to send message' 
       });
+      
+      // Remove temp message on error
+      dispatch({ 
+        type: 'DELETE_MESSAGE', 
+        payload: { conversationId: request.conversationId, messageId: `temp-${Date.now()}` } 
+      });
+      
       throw error;
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });

@@ -8,6 +8,7 @@ import type {
   MessagingEvent 
 } from '../types/messaging';
 import { apiClient } from './apiClient';
+import { validateEnvironment, getMessagingConfig } from '../utils/envValidation';
 
 /**
  * Messaging Service - Handles all messaging-related operations
@@ -27,11 +28,20 @@ export class MessagingService {
   private retryAttempts = 0;
   private maxRetries = 3;
   private reconnectTimeout?: number;
+  private envConfig = validateEnvironment();
+  private messagingConfig = getMessagingConfig(this.envConfig);
 
   constructor() {
     // Reset state for testing
     this.messageQueue = [];
     this.retryAttempts = 0;
+    
+    console.log('[MessagingService] Initialized with config:', {
+      baseUrl: this.messagingConfig.baseUrl,
+      timeout: this.messagingConfig.timeout,
+      retryAttempts: this.messagingConfig.retryAttempts,
+      environment: this.envConfig.isProduction ? 'production' : 'development'
+    });
   }
 
   static getInstance(): MessagingService {

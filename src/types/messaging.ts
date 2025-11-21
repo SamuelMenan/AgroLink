@@ -9,7 +9,7 @@ export interface Message {
   deliveredAt?: string;
   mimeType?: string;
   attachments?: MessageAttachment[];
-  status: 'sent' | 'delivered' | 'read' | 'failed';
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 }
 
 export interface Conversation {
