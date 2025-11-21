@@ -29,7 +29,7 @@ export default function CaptchaGate({ onChange, onToken }: Props) {
   return (
     <div className="mt-2">
       {gSitekey ? (
-        <ReCAPTCHA sitekey={gSitekey} onChange={(token) => { setSolved(!!token); onToken?.(token || null) }} onExpired={() => { setSolved(false); onToken?.(null) }} />
+        <ReCAPTCHA sitekey={gSitekey} onChange={(token: string | null) => { setSolved(!!token); onToken?.(token || null) }} onExpired={() => { setSolved(false); onToken?.(null) }} />
       ) : (
         <HCaptcha sitekey={hSitekey!} onVerify={(token) => { setSolved(true); onToken?.(token) }} onExpire={() => { setSolved(false); onToken?.(null) }} onError={() => { setSolved(false); onToken?.(null) }} />
       )}
