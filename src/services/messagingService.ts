@@ -82,7 +82,7 @@ export async function createConversation(
     })
 
     // Paso 1: crear conversación y añadir participantes en una sola llamada RPC
-    const rpcResponse = await fetch(`${API_BASE}/rpc/create_conversation`, {
+    const rpcResponse = await fetch(`/api/rpc/create_conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -96,8 +96,8 @@ export async function createConversation(
     })
 
     if (!rpcResponse.ok) {
-      // Fallback si la función RPC no existe (404) -> crear manualmente
-      if (rpcResponse.status === 404) {
+      // Fallback si la función RPC no existe (404) o no permite método (405)
+      if (rpcResponse.status === 404 || rpcResponse.status === 405) {
         console.warn('[createConversation] RPC no disponible (404). Usando fallback adaptativo.')
 
         // Intento 1: insertar según esquema remoto (buyer_id, seller_id, product_id)
@@ -175,14 +175,14 @@ export async function createConversation(
 
         // Mensaje inicial
         if (initialMessage) {
-          const msgResp = await fetch(`${API_BASE}/messages`, {
+          const msgResp = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
               'x-client-request-id': Math.random().toString(36).slice(2)
             },
-            body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage })
+            body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage, type: 'text' })
           })
           if (!msgResp.ok) {
             const txt = await msgResp.text()
@@ -228,7 +228,7 @@ export async function createConversation(
 
     // Paso 2: si hay mensaje inicial, enviarlo
     if (initialMessage) {
-      const msgResp = await fetch(`${API_BASE}/messages`, {
+      const msgResp = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -237,7 +237,8 @@ export async function createConversation(
         body: JSON.stringify({
           conversation_id: conversationId,
           sender_id: currentUserId,
-          content: initialMessage
+          content: initialMessage,
+          type: 'text'
         })
       })
       if (!msgResp.ok) {
