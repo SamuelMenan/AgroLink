@@ -49,13 +49,26 @@ END $$;
 -- =========================
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
-  product_id uuid references public.products(id) on delete set null,
+  product_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists idx_conversations_product on public.conversations(product_id);
 create index if not exists idx_conversations_updated on public.conversations(updated_at desc);
+
+-- Add foreign key to products if the table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'products') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'id') THEN
+      ALTER TABLE public.conversations ADD CONSTRAINT fk_conversations_product 
+        FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
+    END IF;
+  END IF;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
 
 create table if not exists public.conversation_participants (
   conversation_id uuid not null references public.conversations(id) on delete cascade,
