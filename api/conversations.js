@@ -202,7 +202,7 @@ export default async function handler(req, res) {
                   conversation_id: conv.id,
                   sender_id: buyer_id,
                   content: initial_message,
-                  message_type: 'text'
+                  message_type: 'message'
                 })
               })
             }
@@ -314,7 +314,7 @@ export default async function handler(req, res) {
             conversation_id: conversation.id,
             sender_id: buyer_id,
             content: initial_message,
-            message_type: 'text'
+            message_type: 'message'
           })
         })
       }
@@ -400,7 +400,7 @@ export default async function handler(req, res) {
           conversation_id,
             sender_id,
             content,
-            message_type: type || 'text',
+            message_type: type || 'message',
             is_from_buyer: is_from_buyer ?? null,
             quick_request_type: quick_request_type || null,
             quick_response_type: quick_response_type || null,

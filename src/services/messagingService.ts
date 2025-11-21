@@ -182,7 +182,7 @@ export async function createConversation(
               'Authorization': `Bearer ${token}`,
               'x-client-request-id': Math.random().toString(36).slice(2)
             },
-            body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage, type: 'text' })
+            body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage, type: 'message' })
           })
           if (!msgResp.ok) {
             const txt = await msgResp.text()
@@ -238,7 +238,7 @@ export async function createConversation(
           conversation_id: conversationId,
           sender_id: currentUserId,
           content: initialMessage,
-          type: 'text'
+          type: 'message'
         })
       })
       if (!msgResp.ok) {
@@ -395,10 +395,26 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
       url: `${API_BASE}/conversations?action=messages&id=${conversationId}`
     })
     
+    if (response.status === 403 && /No eres participante/i.test(errorText)) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        const currentUserId = payload.sub || payload.user_id || payload.id
+        if (currentUserId) {
+          await addParticipant(conversationId, currentUserId)
+          const retry = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          if (retry.ok) {
+            return retry.json()
+          }
+        }
+      } catch {}
+    }
+
     let errorMessage = 'Error al obtener mensajes'
-    if (response.status === 403) {
-      errorMessage = 'No tienes permisos para ver los mensajes de esta conversación.'
-    } else if (response.status === 401) {
+    if (response.status === 401) {
       errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
     } else if (response.status === 404) {
       errorMessage = 'La conversación no existe o fue eliminada.'
@@ -445,7 +461,7 @@ export async function sendMessage(
       sender_id: senderId,
       sender_name: senderName,
       content,
-      type: 'text',
+      type: 'message',
       is_from_buyer: isFromBuyer
     })
   })
@@ -470,7 +486,7 @@ export async function sendMessage(
             sender_id: senderId,
             sender_name: senderName,
             content,
-            type: 'text',
+            type: 'message',
             is_from_buyer: isFromBuyer
           })
         })
@@ -492,7 +508,7 @@ export async function sendMessage(
         sender_id: senderId,
         sender_name: senderName,
         content,
-        type: 'text',
+        type: 'message',
         is_from_buyer: isFromBuyer
       },
       timestamp: new Date().toISOString()
