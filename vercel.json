@@ -12,6 +12,9 @@
     },
     "api/utils.js": {
       "maxDuration": 30
+    },
+    "api/debug/auth.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
@@ -33,6 +36,7 @@
     { "source": "/api/proxy/api/v1/conversations/(.*)/messages", "destination": "/api/conversations/$1/messages" },
     { "source": "/api/proxy/api/v1/conversations/(.*)/messages/(.*)", "destination": "/api/conversations/$1/messages/$2" },
     { "source": "/api/proxy/api/v1/conversations/participants", "destination": "/api/conversations?action=participants" },
+    { "source": "/api/proxy/api/v1/debug/auth", "destination": "/api/debug/auth" },
 
     { "source": "/api/proxy/(.*)", "destination": "https://agrolinkbackend.onrender.com/$1" },
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
