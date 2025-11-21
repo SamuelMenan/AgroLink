@@ -16,6 +16,14 @@ export type Product = {
   status: ProductStatus
   created_at: string
   updated_at?: string
+  // New fields
+  price_per_unit?: number
+  price_per_kilo?: number
+  department?: string
+  municipality?: string
+  detailed_description?: string
+  condition?: 'new' | 'used' | 'refurbished'
+  stock_available?: boolean
 }
 
 export const PRODUCT_CATEGORIES = [

@@ -14,17 +14,34 @@ export default function PublishProduct() {
     setError(null)
     try {
       if (!user) { setError('Debes iniciar sesión.'); return }
+      
+      // Determine which price to use
+      let finalPrice = Number(values.price)
+      if (values.pricePerUnit) {
+        finalPrice = Number(values.pricePerUnit)
+      } else if (values.pricePerKilo) {
+        finalPrice = Number(values.pricePerKilo)
+      }
+      
       const created = await createProduct({
         userId: user.id,
         name: values.name.trim(),
         description: values.description.trim(),
-        price: Number(values.price),
+        price: finalPrice,
         quantity: Number(values.quantity),
         category: values.category,
         images: values.images,
         location: values.location?.trim() || undefined,
         lat: values.lat,
         lng: values.lng,
+        // New fields
+        pricePerUnit: values.pricePerUnit ? Number(values.pricePerUnit) : undefined,
+        pricePerKilo: values.pricePerKilo ? Number(values.pricePerKilo) : undefined,
+        department: values.department,
+        municipality: values.municipality,
+        detailedDescription: values.detailedDescription?.trim() || undefined,
+        condition: values.condition,
+        stockAvailable: values.stockAvailable,
       })
       setPublishedId(created.id)
       // Auto-redirect to my products after 1.5s

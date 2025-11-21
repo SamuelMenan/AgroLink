@@ -1,6 +1,7 @@
 import type { Product } from '../types/product'
 import { v4 as uuidv4 } from './uuid'
 import { apiFetch } from './apiClient'
+import { DEPARTMENTS, MUNICIPALITIES } from './locationService'
 
 // Backend-only implementation: all persistence via REST to /api/* controllers.
 
@@ -15,6 +16,14 @@ type CreateInput = {
   location?: string
   lat?: number
   lng?: number
+  // New fields
+  pricePerUnit?: number
+  pricePerKilo?: number
+  department?: string
+  municipality?: string
+  detailedDescription?: string
+  condition?: 'new' | 'used' | 'refurbished'
+  stockAvailable?: boolean
 }
 
 async function uploadSingleImage(userId: string, file: File): Promise<string> {
@@ -42,6 +51,17 @@ export async function uploadImages(userId: string, files: File[]): Promise<strin
 
 export async function createProduct(input: CreateInput): Promise<Product> {
   const image_urls = input.images.length ? await uploadImages(input.userId, input.images) : []
+  
+  // Build location string from department and municipality
+  let location = input.location
+  if (input.department && input.municipality) {
+    const dept = DEPARTMENTS.find(d => d.id === input.department)
+    const mun = MUNICIPALITIES.find(m => m.id === input.municipality)
+    if (dept && mun) {
+      location = `${mun.name}, ${dept.name}`
+    }
+  }
+  
   const payload = {
     user_id: input.userId,
     name: input.name,
@@ -51,9 +71,17 @@ export async function createProduct(input: CreateInput): Promise<Product> {
     category: input.category,
     image_urls,
     status: 'activo',
-    location: input.location,
+    location,
     lat: input.lat,
     lng: input.lng,
+    // New fields
+    price_per_unit: input.pricePerUnit,
+    price_per_kilo: input.pricePerKilo,
+    department: input.department,
+    municipality: input.municipality,
+    detailed_description: input.detailedDescription,
+    condition: input.condition,
+    stock_available: input.stockAvailable,
     created_at: new Date().toISOString()
   }
   const res = await apiFetch('/api/v1/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
