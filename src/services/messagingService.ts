@@ -94,6 +94,80 @@ export async function createConversation(
     })
 
     if (!rpcResponse.ok) {
+      // Fallback si la función RPC no existe (404) -> crear manualmente
+      if (rpcResponse.status === 404) {
+        console.warn('[createConversation] RPC no disponible (404). Usando fallback por pasos.')
+        // Paso A: crear conversación vacía
+        const convResp = await fetch(`${API_BASE}/conversations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ product_id: productId || null })
+        })
+        if (!convResp.ok) {
+          const txt = await convResp.text()
+          throw new Error(`Error creando conversación (fallback): ${convResp.status} ${txt}`)
+        }
+        const convData = await convResp.json()
+        const conversationId = convData.id
+
+        // Paso B: añadir participante actual (requerido para poder añadir al otro)
+        const selfPartResp = await fetch(`${API_BASE}/conversation_participants`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ conversation_id: conversationId, user_id: currentUserId })
+        })
+        if (!selfPartResp.ok) {
+          const txt = await selfPartResp.text()
+          console.error('[createConversation] Fallo añadiendo participante propio', { status: selfPartResp.status, txt })
+          throw new Error('Error al añadir participante (propio)')
+        }
+
+        // Paso C: añadir participante destino (permitido porque ya somos participantes)
+        const otherPartResp = await fetch(`${API_BASE}/conversation_participants`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ conversation_id: conversationId, user_id: participantId })
+        })
+        if (!otherPartResp.ok) {
+          const txt = await otherPartResp.text()
+          console.warn('[createConversation] Fallo añadiendo segundo participante; la conversación queda con un solo usuario', { status: otherPartResp.status, txt })
+        }
+
+        // Paso D: mensaje inicial (opcional)
+        if (initialMessage) {
+          const msgResp = await fetch(`${API_BASE}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ conversation_id: conversationId, sender_id: currentUserId, content: initialMessage })
+          })
+          if (!msgResp.ok) {
+            const txt = await msgResp.text()
+            console.warn('[createConversation] Mensaje inicial falló en fallback', { status: msgResp.status, txt })
+          }
+        }
+
+        return {
+          id: conversationId,
+          product_id: productId || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          participants: [currentUserId, participantId]
+        } as unknown as Conversation
+      }
+
+      // Otros errores distintos de 404
       const errorText = await rpcResponse.text()
       let errorData: { error?: string; details?: any; debug?: any } = {}
       try { errorData = JSON.parse(errorText) } catch { errorData = { error: errorText } }
