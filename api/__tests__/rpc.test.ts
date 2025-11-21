@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import handlerRoot from '../rpc.js'
-import handlerFn from '../rpc/[fn].js'
+
 
 const makeReq = (method: string, url: string, headers?: Record<string, string>, bodyObj?: any) => {
   const headersLower = Object.fromEntries(Object.entries(headers || {}).map(([k, v]) => [k.toLowerCase(), v]))
@@ -12,6 +12,8 @@ const makeReq = (method: string, url: string, headers?: Record<string, string>, 
       ? async function* () { yield Buffer.from(JSON.stringify(bodyObj)) }
       : async function* () { }
   }
+  // Mock URL constructor to return a valid URL object
+  req.url = url
   return req
 }
 
@@ -43,9 +45,9 @@ describe('rpc handlers', () => {
   })
 
   it('POST returns 200 and payload on dynamic', async () => {
-    const req = makeReq('POST', '/api/rpc/create_conversation', { origin: 'http://localhost', authorization: 'Bearer t', 'content-type': 'application/json' }, { product_id: 'p', participant_ids: ['a','b'] })
+    const req = makeReq('POST', '/api/rpc?fn=create_conversation', { origin: 'http://localhost', authorization: 'Bearer t', 'content-type': 'application/json' }, { product_id: 'p', participant_ids: ['a','b'] })
     const res = makeRes()
-    await handlerFn(req, res)
+    await handlerRoot(req, res)
     expect(res.statusCode).toBe(200)
     expect(res.body).toBe('conv-123')
   })

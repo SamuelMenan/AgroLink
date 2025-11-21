@@ -38,12 +38,18 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Se requiere token de usuario autenticado, no anon key' })
   }
 
-  // Parse function name from path: /api/rpc/<fn>
-  const urlObj = new URL(req.url, 'http://localhost')
-  const pathParts = urlObj.pathname.split('/')
-  const fnName = pathParts.pop() || ''
+  // Parse function name from query: ?fn=<fn>
+  let fnName = null
+  try {
+    const urlObj = new URL(req.url, 'http://localhost')
+    fnName = urlObj.searchParams.get('fn')
+  } catch {
+    // Fallback: parse query string manually for test environment
+    const queryMatch = req.url.match(/\?fn=([^&]*)/)
+    fnName = queryMatch ? queryMatch[1] : null
+  }
   if (!fnName) {
-    return res.status(400).json({ error: 'Nombre de función RPC requerido' })
+    return res.status(400).json({ error: 'Nombre de función RPC requerido (query fn)' })
   }
 
   // Read JSON body once

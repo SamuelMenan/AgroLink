@@ -82,7 +82,7 @@ export async function createConversation(
     })
 
     // Paso 1: crear conversación y añadir participantes en una sola llamada RPC
-    const rpcResponse = await fetch(`/api/rpc/create_conversation`, {
+    const rpcResponse = await fetch(`/api/rpc?fn=create_conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -98,7 +98,7 @@ export async function createConversation(
     if (!rpcResponse.ok) {
       // Fallback si la función RPC no existe (404) o no permite método (405)
       if (rpcResponse.status === 404 || rpcResponse.status === 405) {
-        console.warn('[createConversation] RPC no disponible (404). Usando fallback adaptativo.')
+        console.warn('[createConversation] RPC no disponible (404 o 405). Usando fallback adaptativo.')
 
         // Intento 1: insertar según esquema remoto (buyer_id, seller_id, product_id)
         const convAttemptBody1 = {

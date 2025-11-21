@@ -129,67 +129,66 @@ export default async function handler(req, res) {
         res.end(buf)
         
       } finally {
-        clearTimeout(id)
-      }
-
-    } else if (method === 'PATCH') {
-      // Mark all notifications as read - consolidated from read-all.js
-      if (!userId) {
-        res.status(400).json({ error: 'user_id requerido' })
-        return
-      }
-
-      const authHeader = req.headers['authorization']
-      if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
-        console.error('[notifications] Missing or invalid authorization header for PATCH request')
-        res.status(401).json({ 
-          error: 'Authorization requerido',
-          details: {
-            reason: 'Missing or invalid authorization header',
-            timestamp: new Date().toISOString(),
-            origin: origin
-          }
-        })
-        return
-      }
-
-      const endpoint = `${supabaseUrl.replace(//$/, '')}/rest/v1/notifications?user_id=eq.${encodeURIComponent(userId)}`
-      const nowIso = new Date().toISOString()
-      
-      const headers = {
-        'accept': 'application/json',
-        'content-type': 'application/json',
-        'apikey': supabaseAnon,
-        'Authorization': String(authHeader),
-        'Prefer': 'return=minimal',
-      }
-
-      const controller = new AbortController()
-      const timeout = parseInt(process.env.NOTIFICATIONS_TIMEOUT) || 9000
-      const id = setTimeout(() => controller.abort(), timeout)
-      
-      try {
-        const resp = await fetch(endpoint, { 
-          method: 'PATCH', 
-          headers, 
-          body: JSON.stringify({ read_at: nowIso }), 
-          signal: controller.signal 
-        })
-        
-        res.status(resp.ok ? resp.status : 502)
-        res.setHeader('content-type', 'application/json')
-        const text = await resp.text().catch(() => '')
-        res.end(text || '{}')
-        
-      } catch (e) {
-        res.status(502).json({ ok: false, error: (e && e.message) || 'fetch failed' })
-      } finally {
-        clearTimeout(id)
-      }
-
-    } else {
-      res.status(405).json({ error: 'Método no permitido' })
+      clearTimeout(id)
     }
+
+  } else if (method === 'PATCH') {
+    // Mark all notifications as read - consolidated from read-all.js
+    if (!userId) {
+      res.status(400).json({ error: 'user_id requerido' })
+      return
+    }
+
+    const authHeader = req.headers['authorization']
+    if (!authHeader || !String(authHeader).startsWith('Bearer ')) {
+      console.error('[notifications] Missing or invalid authorization header for PATCH request')
+      res.status(401).json({ 
+        error: 'Authorization requerido',
+        details: {
+          reason: 'Missing or invalid authorization header',
+          timestamp: new Date().toISOString(),
+          origin: origin
+        }
+      })
+      return
+    }
+
+    const endpoint = `${supabaseUrl.replace(//$/, '')}/rest/v1/notifications?user_id=eq.${encodeURIComponent(userId)}`
+    const nowIso = new Date().toISOString()
+    
+    const headers = {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'apikey': supabaseAnon,
+      'Authorization': String(authHeader),
+      'Prefer': 'return=minimal',
+    }
+
+    const controller = new AbortController()
+    const timeout = parseInt(process.env.NOTIFICATIONS_TIMEOUT) || 9000
+    const id = setTimeout(() => controller.abort(), timeout)
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ read_at: nowIso }),
+        signal: controller.signal
+      })
+      
+      res.status(resp.status)
+      res.setHeader('content-type', 'application/json')
+      const text = await resp.text().catch(() => '')
+      res.end(text || '{}')
+      
+    } catch (e) {
+      res.status(502).json({ ok: false, error: (e && e.message) || 'fetch failed' })
+    } finally {
+      clearTimeout(id)
+    }
+  } else {
+    res.status(405).json({ error: 'Método no permitido' })
+  }
     
     // Production logging for successful requests
     if (process.env.ENABLE_PRODUCTION_LOGGING === 'true') {
