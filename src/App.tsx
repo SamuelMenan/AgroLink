@@ -32,7 +32,6 @@ function App() {
         <Route path="/oauth/callback" element={<OAuthCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/dashboard/settings" element={<AccountPrivacy />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/simple" element={<SimpleHub />} />
@@ -42,6 +41,7 @@ function App() {
           <Route path="/dashboard/notifications" element={<NotificationsPage />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/dashboard/orders" element={<OrdersDashboard />} />
+          <Route path="/dashboard/settings" element={<AccountPrivacy />} />
         </Route>
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />

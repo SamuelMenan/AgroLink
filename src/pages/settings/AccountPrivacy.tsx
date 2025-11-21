@@ -39,21 +39,7 @@ export default function AccountPrivacy(){
   useEffect(() => {
     let mounted = true
     async function load(){
-      if (!user) {
-        const guest: Profile = {
-          user_id: 'guest',
-          full_name: '',
-          email: '',
-          phone: '',
-          address: '',
-          name_visibility: 'contacts',
-          email_visibility: 'contacts',
-          phone_visibility: 'contacts',
-          address_visibility: 'private',
-        }
-        if (mounted) setProfile(guest)
-        return
-      }
+      if (!user) return
       try {
         const p = await getMyProfile(user.id)
         if (mounted) setProfile(p)
