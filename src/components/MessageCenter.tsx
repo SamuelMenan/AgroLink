@@ -356,6 +356,21 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
         || (message.sender_id === selectedConversation?.buyer_id ? selectedConversation?.buyer_name : selectedConversation?.seller_name)
         || 'Usuario')
       : 'Tú'
+
+    console.log('[MessageCenter] renderMessage', {
+      messageId: message.id,
+      senderId: message.sender_id,
+      senderName: message.sender_name,
+      otherName,
+      isFromCurrentUser,
+      conversation: selectedConversation ? {
+        id: selectedConversation.id,
+        buyer_id: selectedConversation.buyer_id,
+        seller_id: selectedConversation.seller_id,
+        buyer_name: selectedConversation.buyer_name,
+        seller_name: selectedConversation.seller_name
+      } : null
+    })
     
     return (
       <div key={message.id} className={`flex ${isFromCurrentUser ? 'justify-end' : 'justify-start'} mb-3`}>

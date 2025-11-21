@@ -375,9 +375,28 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
   }
   const response = await fetch(`${API_BASE}/conversations?action=messages&id=${conversationId}`, {
     headers: {
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'x-client-request-id': Math.random().toString(36).slice(2)
     }
   })
+
+  // Debug log for response
+  console.log('[getMessages] Response status:', response.status)
+  if (response.ok) {
+    const data = await response.json()
+    console.log('[getMessages] Messages received:', data.length)
+    data.forEach((msg: Message, i: number) => {
+      console.log(`[getMessages] Message ${i}:`, {
+        id: msg.id,
+        sender_id: msg.sender_id,
+        sender_name: msg.sender_name,
+        content: msg.content.substring(0, 50)
+      })
+    })
+    return data
+  }
+
+  // Rest of error handling...
 
   if (!response.ok) {
     const errorText = await response.text()

@@ -373,14 +373,19 @@ export default async function handler(req, res) {
         if (!Array.isArray(partJson) || partJson.length === 0) {
           return res.status(403).json({ error: 'No eres participante de esta conversación' })
         }
-        const messagesUrl = `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${targetId}&order=created_at.asc&select=*`
+        const messagesUrl = `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${targetId}&order=created_at.asc&select=*,sender:sender_id(id,full_name)`
         const msgResp = await fetch(messagesUrl, {
           headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
         })
         if (!msgResp.ok) {
           return res.status(msgResp.status).json({ error: 'Error al obtener mensajes', details: await msgResp.text() })
         }
-        return res.status(200).json(await msgResp.json())
+        const raw = await msgResp.json()
+        const enriched = raw.map(m => ({
+          ...m,
+          sender_name: m.sender?.full_name || null
+        }))
+        return res.status(200).json(enriched)
       } else if (req.method === 'POST') {
         const { conversation_id, sender_id, content, type, is_from_buyer, in_reply_to, quick_request_type, quick_response_type } = parsedBody || req.body || {}
         if (!conversation_id || !sender_id || !content || conversation_id !== targetId) {
@@ -417,6 +422,18 @@ export default async function handler(req, res) {
           return res.status(msgResp.status).json({ error: 'Error al enviar mensaje', details: await msgResp.text() })
         }
         const arr = await msgResp.json(); const msg = arr[0]
+        // Enrich sender_name from auth.users
+        if (msg.sender_id) {
+          const userResp = await fetch(`${SUPABASE_URL}/rest/v1/auth/users?id=eq.${msg.sender_id}&select=id,raw_user_meta_data->full_name`, {
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}` }
+          })
+          if (userResp.ok) {
+            const userArr = await userResp.json()
+            if (userArr[0]) {
+              msg.sender_name = userArr[0].raw_user_meta_data?.full_name || null
+            }
+          }
+        }
         // bump conversation updated_at
         await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${targetId}`, {
           method: 'PATCH',
