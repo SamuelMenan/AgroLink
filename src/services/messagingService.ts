@@ -361,7 +361,8 @@ export async function sendQuickResponse(
   conversationId: string,
   sellerId: string,
   sellerName: string,
-  responseType: QuickResponseType
+  responseType: QuickResponseType,
+  originalMessageId?: string
 ): Promise<Message> {
   const response = QUICK_RESPONSES.find(r => r.type === responseType)
   if (!response) {
@@ -381,6 +382,7 @@ export async function sendQuickResponse(
       content: response.message,
       type: 'quick_response',
       quick_response_type: responseType,
+      in_reply_to: originalMessageId,
       is_from_buyer: false
     })
   })

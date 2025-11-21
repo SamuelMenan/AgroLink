@@ -39,6 +39,7 @@ export interface Message {
   status: MessageStatus
   quick_request_type?: QuickRequestType
   quick_response_type?: QuickResponseType
+  in_reply_to?: string
   purchase_step?: PurchaseStepType
   payment_method?: PaymentMethod
   delivery_method?: DeliveryMethod
