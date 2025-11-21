@@ -15,6 +15,7 @@ export default function Login() {
   const [facebookLoading, setFacebookLoading] = useState(false)
   const [remember, setRemember] = useState(true)
   const [captchaOk, setCaptchaOk] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [showPwd, setShowPwd] = useState(false)
 
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
@@ -47,9 +48,9 @@ export default function Login() {
     }
     setSubmitting(true)
     try {
-      const { error } = await signInWithCredentials({ identifier: identifier.trim(), password })
+      const { error } = await signInWithCredentials({ identifier: identifier.trim(), password, captchaToken: captchaToken || undefined })
       if (error) {
-        setFormError('Credenciales incorrectas')
+        setFormError(error)
         return
       }
       // Persistencia: se guarda preferencia (placeholder UI). Implementación avanzada: custom storage por sesión.
@@ -112,6 +113,7 @@ export default function Login() {
                 )}
               </button>
             </div>
+            <CaptchaGate onChange={setCaptchaOk} onToken={setCaptchaToken} />
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -130,10 +132,9 @@ export default function Login() {
               ¿Olvidaste tu contraseña?
             </a>
           </div>
-          <CaptchaGate onChange={setCaptchaOk} />
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <button
-            disabled={submitting}
+            disabled={submitting || (!!import.meta.env.VITE_HCAPTCHA_SITEKEY && !captchaOk)}
             type="submit"
             className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
           >

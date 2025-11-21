@@ -21,8 +21,17 @@ export function clearTokens() {
 function decodeJwtPayload(token: string): unknown {
   try {
     const part = token.split('.')[1];
-    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json);
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+    const binary = atob(b64 + pad);
+    const bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
+    let jsonStr: string;
+    try {
+      jsonStr = new TextDecoder('utf-8').decode(bytes);
+    } catch {
+      jsonStr = decodeURIComponent([...binary].map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    }
+    return JSON.parse(jsonStr);
   } catch { return {}; }
 }
 
@@ -320,9 +329,11 @@ export async function signUp(fullName: string, email: string, password: string, 
   }
 }
 
-export async function signInEmail(email: string, password: string) {
+export async function signInEmail(email: string, password: string, captchaToken?: string) {
   try {
-    const resp = await post(`${AUTH_PREFIX}/sign-in`, { email, password });
+    const body: Record<string, unknown> = { email, password };
+    if (captchaToken) body[captchaFieldName()] = captchaToken;
+    const resp = await post(`${AUTH_PREFIX}/sign-in`, body);
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     try { await warmupProxy(); } catch { /* ignore */ }
     return resp;
@@ -349,9 +360,11 @@ export async function signInEmail(email: string, password: string) {
   }
 }
 
-export async function signInPhone(phone: string, password: string) {
+export async function signInPhone(phone: string, password: string, captchaToken?: string) {
   try {
-    const resp = await post(`${AUTH_PREFIX}/sign-in`, { phone, password });
+    const body: Record<string, unknown> = { phone, password };
+    if (captchaToken) body[captchaFieldName()] = captchaToken;
+    const resp = await post(`${AUTH_PREFIX}/sign-in`, body);
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     try { await warmupProxy(); } catch { /* ignore */ }
     return resp;
@@ -431,3 +444,8 @@ const BASE_URL = resolveBaseUrl();
 // Usar siempre ruta proxied para evitar fallos de CORS/502 en redirecciones OAuth.
 export const getOAuthStartUrl = (provider: string, next: string) =>
   `/api/proxy/api/v1/auth/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+
+function captchaFieldName() {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+  return env.VITE_RECAPTCHA_SITE_KEY ? 'recaptcha_token' : 'hcaptcha_token';
+}
