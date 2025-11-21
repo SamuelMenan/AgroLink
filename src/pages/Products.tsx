@@ -219,26 +219,30 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     setErr(null)
     
     try {
-      // Create or get conversation with the seller for this product
+      // Crear conversación y enviar mensaje
       await createConversation({
         participantId: p.user_id,
         productId: p.id,
         initialMessage: message
       })
       
-      // Navigate to messages page with the conversation selected
-      window.location.href = '/messages'
+      console.log('Mensaje enviado:', {
+        from: user.id,
+        to: p.user_id,
+        productId: p.id,
+        message: message
+      })
       
-      // Close modal and reset form
+      // Show success message
       setMessageSent(true)
       setTimeout(() => {
         setMessageSent(false)
         setIsMessageModalOpen(false)
         setMessage('Hola. ¿Sigue estando disponible?')
-      }, 1000)
+      }, 2000)
       
     } catch (error) {
-      console.error('Error creating conversation:', error)
+      console.error('Error sending message:', error)
       setErr('Error al enviar el mensaje. Por favor intenta de nuevo.')
     } finally {
       setIsSending(false)
