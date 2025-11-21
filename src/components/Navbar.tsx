@@ -1,7 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import appLogo from '../assets/logo.png'
-import NotificationsBell from './NotificationsBell'
 import { getCartCount, onCartChange } from '../services/cartService'
 import { useEffect, useState } from 'react'
 import SupportAssistant from './SupportAssistant'
@@ -57,7 +56,6 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                <NotificationsBell />
                 <div className="flex items-center gap-2 rounded-full bg-green-50 px-2 py-1">
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white">
                     {initials || 'U'}

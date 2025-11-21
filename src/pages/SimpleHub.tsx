@@ -16,7 +16,6 @@ export default function SimpleHub() {
         <BigButton to="/messages" icon="message" title="Mensajes" subtitle="Chatea con compradores y vendedores" />
         <BigButton to="/dashboard/orders" icon="list_alt" title="Pedidos" subtitle="Gestiona estados y descargas" />
         <BigButton to="/dashboard/settings" icon="manage_accounts" title="Configuración" subtitle="Perfil y privacidad" />
-        <BigButton to="/dashboard/notifications" icon="notifications" title="Notificaciones" subtitle="Novedades y avisos" />
       </section>
 
       <section className="mt-6 rounded-lg border bg-white p-4">
@@ -26,7 +25,7 @@ export default function SimpleHub() {
         </h2>
         <ol className="mt-3 space-y-2 text-gray-800">
           <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">1</span><span>Publica tu producto con precio y una foto clara.</span></li>
-          <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">2</span><span>Recibe notificaciones cuando alguien esté interesado.</span></li>
+          <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">2</span><span>Recibe mensajes cuando alguien esté interesado.</span></li>
           <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">3</span><span>Contacta con la persona para acordar entrega y pago.</span></li>
           <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">4</span><span>Entrega el producto y confirma la venta.</span></li>
         </ol>
