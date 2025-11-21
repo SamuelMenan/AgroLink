@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { type Product } from '../types/product'
 import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
 
 import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
@@ -142,10 +142,7 @@ function useDebouncedValue<T>(value: T, delay = 300) {
 
 function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, userLng?: number }){
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const [msgText, setMsgText] = useState('Hola. ¿Sigue estando disponible?')
-  const [sendingMsg, setSendingMsg] = useState(false)
-  const [msgSent, setMsgSent] = useState(false)
+
   const [err, setErr] = useState<string | null>(null)
   const [added, setAdded] = useState(false)
   const [removed, setRemoved] = useState(false)
@@ -203,91 +200,6 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     return ()=>{ alive = false }
   }, [p.id])
   if (removed) return null
-  async function sendMarketplaceMessage(){
-    setErr(null)
-    if (!user) {
-      navigate(`/login?intent=message&next=/products`)
-      return
-    }
-    if (isOwner) {
-      setErr('Este es tu producto.')
-      return
-    }
-    const text = msgText.trim()
-    if (!text) {
-      setErr('Escribe un mensaje.')
-      return
-    }
-    setSendingMsg(true)
-    
-    // Enhanced pre-warming and retry logic
-    const maxRetries = 2
-    let lastError: Error | null = null
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Enhanced pre-warming with multiple endpoints
-        try {
-          await Promise.all([
-            fetch('/api/proxy/actuator/health', { cache: 'no-store' }).catch(() => {}),
-            fetch('/api/warm', { cache: 'no-store' }).catch(() => {})
-          ])
-        } catch {
-            // Silently ignore health check errors
-          }
-        
-        // Wait a bit after pre-warming for cold start mitigation
-        if (attempt > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        }
-        
-        // For now, just simulate message sending
-        // TODO: Implement proper messaging integration when messaging system is ready
-        setTimeout(() => {
-          setMsgSent(true)
-          setSendingMsg(false)
-        }, 1000);
-        return // Success
-        
-      } catch (e) {
-        lastError = e instanceof Error ? e : new Error('Unknown error')
-        const m = lastError.message
-        const is5xx = /\b5\d{2}\b/.test(m) || /Error\s+5\d\d/.test(m) || m.includes('502') || m.includes('503') || m.includes('504')
-        
-        if (is5xx && attempt < maxRetries) {
-          console.warn(`[sendMarketplaceMessage] Attempt ${attempt}/${maxRetries} failed with server error, retrying...`)
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempt)) // Exponential backoff
-          continue
-        }
-        
-        // Final error handling
-        let errorMsg = m
-        if (is5xx) {
-          errorMsg = 'El servidor está iniciando, por favor intenta de nuevo en unos segundos'
-        } else if (m.includes('401')) {
-          errorMsg = 'Por favor inicia sesión para enviar mensajes'
-        } else if (m.includes('403')) {
-          errorMsg = 'No tienes permiso para enviar mensajes a este usuario'
-        } else if (m.includes('localmente')) {
-          // This is the offline queue message
-          errorMsg = m
-          setMsgSent(true) // Treat as sent since it's queued
-        }
-        
-        setErr(errorMsg)
-        break // Don't retry non-5xx errors
-      }
-    }
-    
-    if (lastError && !msgSent) {
-      console.error('[sendMarketplaceMessage] Failed after retries:', lastError)
-      if (!err) {
-        setErr('No fue posible enviar el mensaje. Por favor intenta de nuevo.')
-      }
-    }
-    
-    setSendingMsg(false)
-  }
   function onAddToCart(){
     addToCart({ id: p.id, name: p.name, price: p.price, image_url: p.image_urls?.[0], seller_id: p.user_id }, 1)
     setAdded(true)
@@ -418,41 +330,6 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
       ) : (
         <div className="mt-4 space-y-3">
           {err && <p className="text-xs text-red-600" role="alert">{err}</p>}
-          
-          {/* Enhanced Contact Section */}
-          <div className="rounded-xl border border-green-200 bg-white">
-            <div className="border-b border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-900">
-              Contactar al vendedor
-            </div>
-            <div className="p-3">
-              <textarea
-                value={msgText}
-                onChange={(e)=> setMsgText(e.target.value)}
-                rows={2}
-                className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder-gray-500 outline-none focus:border-green-600 focus:ring-2 focus:ring-green-600/20 transition-colors"
-                placeholder="Hola. ¿Sigue estando disponible?"
-                aria-label="Mensaje para el vendedor"
-              />
-              {msgSent ? (
-                <a
-                  href={`/messages?with=${encodeURIComponent(p.user_id)}`}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
-                >
-                  <span className="material-icons-outlined text-[18px]">chat</span>
-                  Abrir chat
-                </a>
-              ) : (
-                <button
-                  onClick={sendMarketplaceMessage}
-                  disabled={sendingMsg || p.stock_available === false}
-                  className="mt-3 w-full rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
-                  aria-label="Enviar mensaje al vendedor"
-                >
-                  {sendingMsg ? 'Enviando…' : p.stock_available === false ? 'Producto agotado' : 'Enviar mensaje'}
-                </button>
-              )}
-            </div>
-          </div>
           
           {/* Enhanced Add to Cart Button */}
           <button 

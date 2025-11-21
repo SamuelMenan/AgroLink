@@ -13,7 +13,6 @@ export default function SimpleHub() {
 
         <BigButton to="/dashboard/products/new" icon="add_circle" title="Publicar producto" subtitle="Publica fácil y rápido" />
         <BigButton to="/dashboard/products" icon="inventory_2" title="Mis publicaciones" subtitle="Edita o elimina" />
-        <BigButton to="/messages" icon="chat" title="Mensajes" subtitle="Chatea con compradores y vendedores" />
         <BigButton to="/dashboard/orders" icon="list_alt" title="Pedidos" subtitle="Gestiona estados y descargas" />
         <BigButton to="/dashboard/settings" icon="manage_accounts" title="Configuración" subtitle="Perfil y privacidad" />
         <BigButton to="/dashboard/notifications" icon="notifications" title="Notificaciones" subtitle="Novedades y avisos" />
@@ -26,8 +25,8 @@ export default function SimpleHub() {
         </h2>
         <ol className="mt-3 space-y-2 text-gray-800">
           <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">1</span><span>Publica tu producto con precio y una foto clara.</span></li>
-          <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">2</span><span>Recibe mensajes: te avisaremos cuando alguien te escriba y podrás responder desde Mensajes.</span></li>
-          <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">3</span><span>Chatea con la persona para acordar entrega y pago.</span></li>
+          <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">2</span><span>Recibe notificaciones cuando alguien esté interesado.</span></li>
+          <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">3</span><span>Contacta con la persona para acordar entrega y pago.</span></li>
           <li className="flex items-start gap-2"><span className="mt-0.5 h-6 w-6 flex-shrink-0 select-none rounded-full bg-green-600 text-center text-sm font-bold text-white">4</span><span>Entrega el producto y confirma la venta.</span></li>
         </ol>
       </section>

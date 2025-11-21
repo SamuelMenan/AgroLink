@@ -6,10 +6,7 @@ Preservar el comportamiento actual de `/api/proxy/*` enviando tráfico al backen
 ## Rewrites
 - `/api/proxy/api/v1/notifications/by-user/(.*)` → `/api/notifications/by-user?user_id=$1`
 - `/api/proxy/api/v1/notifications/read-all/(.*)` → `/api/notifications/read-all?user_id=$1`
-- `/api/proxy/api/v1/conversations` → `https://agrolinkbackend.onrender.com/api/v1/conversations`
-- `/api/proxy/api/v1/conversations/(.*)/participants` → `https://agrolinkbackend.onrender.com/api/v1/conversations/$1/participants`
 - `/api/proxy/api/v1/products` → `/api/products`
-- `/api/proxy/api/v1/messages` → `https://agrolinkbackend.onrender.com/api/v1/messages`
 - `/api/proxy/(.*)` → `https://agrolinkbackend.onrender.com/$1`
 - Assets y SPA fallback permanecen.
 
