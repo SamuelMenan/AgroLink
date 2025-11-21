@@ -335,6 +335,7 @@ COMMENT ON COLUMN public.messages.content IS 'Contenido del mensaje en texto pla
 COMMENT ON COLUMN public.messages.content_ciphertext IS 'Contenido cifrado del mensaje (opcional)';
 COMMENT ON COLUMN public.messages.message_type IS 'Tipo de mensaje: text, image, system, quick_request, quick_response';
 
+DROP FUNCTION IF EXISTS public.create_conversation(uuid, uuid[]);
 create or replace function public.create_conversation(product_id uuid, participant_ids uuid[])
 returns uuid
 language plpgsql
