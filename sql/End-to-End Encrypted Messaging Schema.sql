@@ -47,39 +47,35 @@ END $$;
 -- =========================
 -- Messaging: conversations + participants + messages
 -- =========================
-create table if not exists public.conversations (
+
+-- Drop existing table if it has issues and recreate
+DROP TABLE IF EXISTS public.message_receipts CASCADE;
+DROP TABLE IF EXISTS public.messages_deleted_by CASCADE;
+DROP TABLE IF EXISTS public.archived_conversations CASCADE;
+DROP TABLE IF EXISTS public.messages CASCADE;
+DROP TABLE IF EXISTS public.conversation_participants CASCADE;
+DROP TABLE IF EXISTS public.conversations CASCADE;
+
+create table public.conversations (
   id uuid primary key default gen_random_uuid(),
   product_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create index if not exists idx_conversations_product on public.conversations(product_id);
-create index if not exists idx_conversations_updated on public.conversations(updated_at desc);
+create index idx_conversations_product on public.conversations(product_id);
+create index idx_conversations_updated on public.conversations(updated_at desc);
 
--- Add foreign key to products if the table exists
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'products') THEN
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'products' AND column_name = 'id') THEN
-      ALTER TABLE public.conversations ADD CONSTRAINT fk_conversations_product 
-        FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
-    END IF;
-  END IF;
-EXCEPTION WHEN duplicate_object THEN
-  NULL;
-END $$;
-
-create table if not exists public.conversation_participants (
+create table public.conversation_participants (
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   user_id uuid not null,
   joined_at timestamptz not null default now(),
   primary key (conversation_id, user_id)
 );
-create index if not exists idx_conv_part_user on public.conversation_participants(user_id);
-create index if not exists idx_conv_part_conv on public.conversation_participants(conversation_id);
+create index idx_conv_part_user on public.conversation_participants(user_id);
+create index idx_conv_part_conv on public.conversation_participants(conversation_id);
 
-create table if not exists public.messages (
+create table public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   sender_id uuid not null,
@@ -92,10 +88,10 @@ create table if not exists public.messages (
   deleted_for_audit boolean default false
 );
 
-create index if not exists idx_messages_conversation on public.messages(conversation_id, created_at desc);
-create index if not exists idx_messages_sender on public.messages(sender_id);
+create index idx_messages_conversation on public.messages(conversation_id, created_at desc);
+create index idx_messages_sender on public.messages(sender_id);
 
-create table if not exists public.message_receipts (
+create table public.message_receipts (
   message_id uuid not null references public.messages(id) on delete cascade,
   user_id uuid not null,
   delivered_at timestamptz,
@@ -103,14 +99,14 @@ create table if not exists public.message_receipts (
   primary key (message_id, user_id)
 );
 
-create table if not exists public.messages_deleted_by (
+create table public.messages_deleted_by (
   message_id uuid not null references public.messages(id) on delete cascade,
   user_id uuid not null,
   deleted_at timestamptz not null default now(),
   primary key (message_id, user_id)
 );
 
-create table if not exists public.archived_conversations (
+create table public.archived_conversations (
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   user_id uuid not null,
   archived_at timestamptz not null default now(),
