@@ -4,8 +4,10 @@ import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
+import { MessageCircle } from 'lucide-react'
 
 import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
+import { MessageSellerModal } from '../components/MessageSellerModal'
 
 export default function Products() {
   const [enhancedFilters, setEnhancedFilters] = useState<EnhancedSearchFilters>({
@@ -146,6 +148,7 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
   const [err, setErr] = useState<string | null>(null)
   const [added, setAdded] = useState(false)
   const [removed, setRemoved] = useState(false)
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false)
   const firstImage = p.image_urls?.[0]
   const isOwner = user?.id === p.user_id
   const distanceKm = useMemo(()=>{
@@ -200,10 +203,24 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
     return ()=>{ alive = false }
   }, [p.id])
   if (removed) return null
+  
   function onAddToCart(){
     addToCart({ id: p.id, name: p.name, price: p.price, image_url: p.image_urls?.[0], seller_id: p.user_id }, 1)
     setAdded(true)
     setTimeout(()=> setAdded(false), 1200)
+  }
+
+  async function handleSendMessage(message: string) {
+    // For now, we'll simulate sending a message
+    // In a real implementation, this would call a messaging service
+    console.log(`Sending message to seller ${p.user_id}: ${message}`)
+    
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // For now, just show a success message in console
+    // In the future, this would integrate with your messaging system
+    alert('Mensaje enviado exitosamente. (Funcionalidad de mensajería en desarrollo)')
   }
   return (
     <div className="overflow-hidden rounded-xl border border-green-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -331,6 +348,21 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
         <div className="mt-4 space-y-3">
           {err && <p className="text-xs text-red-600" role="alert">{err}</p>}
           
+          {/* Message Seller Button - New */}
+          <button 
+            onClick={() => setIsMessageModalOpen(true)} 
+            disabled={p.stock_available === false}
+            className={`w-full rounded-md border px-3 py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+              p.stock_available === false
+                ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white'
+            }`}
+            aria-label={`Enviar mensaje al vendedor de ${p.name}`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            Enviar mensaje al vendedor
+          </button>
+          
           {/* Enhanced Add to Cart Button */}
           <button 
             onClick={onAddToCart} 
@@ -348,6 +380,15 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
           </button>
         </div>
       )}
+      
+      {/* Message Seller Modal */}
+      <MessageSellerModal
+        isOpen={isMessageModalOpen}
+        onClose={() => setIsMessageModalOpen(false)}
+        sellerName="Vendedor"
+        productName={p.name}
+        onSendMessage={handleSendMessage}
+      />
     </div>
   )
 }
