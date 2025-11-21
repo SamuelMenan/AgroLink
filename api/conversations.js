@@ -38,6 +38,15 @@ export default async function handler(req, res) {
       // Crear nueva conversación
       const { buyer_id, seller_id, product_id, initial_message } = req.body
 
+      console.log('[conversations] POST request:', {
+        buyer_id,
+        seller_id,
+        product_id,
+        has_initial_message: !!initial_message,
+        has_auth_header: !!req.headers.authorization,
+        token_length: userToken.length
+      })
+
       if (!buyer_id || !seller_id || !product_id) {
         return res.status(400).json({ error: 'Faltan campos requeridos: buyer_id, seller_id, product_id' })
       }
@@ -100,10 +109,24 @@ export default async function handler(req, res) {
 
       if (!conversationResponse.ok) {
         const errorText = await conversationResponse.text()
-        console.error('[conversations] Error creating conversation:', conversationResponse.status, errorText)
+        console.error('[conversations] Error creating conversation:', {
+          status: conversationResponse.status,
+          statusText: conversationResponse.statusText,
+          error: errorText,
+          url: conversationUrl,
+          headers: {
+            has_apikey: !!SUPABASE_ANON_KEY,
+            has_user_token: !!userToken,
+            token_preview: userToken.substring(0, 20) + '...'
+          }
+        })
         return res.status(conversationResponse.status).json({ 
           error: 'Error al crear la conversación',
-          details: errorText 
+          details: errorText,
+          debug: {
+            status: conversationResponse.status,
+            statusText: conversationResponse.statusText
+          }
         })
       }
 
