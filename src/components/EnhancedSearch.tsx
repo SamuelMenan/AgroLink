@@ -198,7 +198,7 @@ export function EnhancedSearch({ filters, onFiltersChange, onSearch, showAdvance
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Basic filters row */}
