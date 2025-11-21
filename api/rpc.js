@@ -11,10 +11,13 @@ export default async function handler(req, res) {
   const corsOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Origin', corsOrigin)
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS,HEAD')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, x-client-request-id')
 
   if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+  if (req.method === 'HEAD') {
     return res.status(200).end()
   }
 

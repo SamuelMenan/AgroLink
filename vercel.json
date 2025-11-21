@@ -15,6 +15,12 @@
     },
     "api/debug/auth.js": {
       "maxDuration": 30
+    },
+    "api/rpc.js": {
+      "maxDuration": 30
+    },
+    "api/rpc/[fn].js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
