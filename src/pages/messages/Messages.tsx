@@ -113,9 +113,9 @@ export default function Messages(){
   const current = conversations.find(c => c.id === convId)
 
   return (
-    <main className="mx-auto flex h-[calc(100vh-56px)] max-w-6xl gap-4 p-4">
+    <main className="mx-auto flex h-[calc(100vh-56px)] max-w-6xl gap-4 p-4 min-h-0">
       {/* Sidebar (oculto en móvil) */}
-      <aside className="hidden w-80 flex-shrink-0 flex-col rounded-2xl border bg-white p-3 sm:flex">
+      <aside className="hidden w-80 flex-shrink-0 flex-col rounded-2xl border bg-white p-3 sm:flex min-h-0">
         <div className="flex items-center justify-between px-2 py-2">
           <div className="text-base font-bold text-gray-800">Conversaciones</div>
           <span className="material-icons-outlined text-gray-500">chat_bubble</span>
@@ -140,7 +140,7 @@ export default function Messages(){
       </aside>
 
       {/* Chat principal */}
-      <section className="flex min-w-0 flex-1 flex-col rounded-2xl border bg-white">
+      <section className="flex min-w-0 flex-1 flex-col rounded-2xl border bg-white min-h-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <Link to="/simple" className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 sm:hidden">
