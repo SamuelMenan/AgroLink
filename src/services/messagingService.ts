@@ -149,6 +149,25 @@ export async function createConversation(
   return response.json()
 }
 
+// Add a participant (seller) when seller_pending is true
+export async function addParticipant(conversationId: string, userId: string): Promise<{ ok: boolean }> {
+  const token = getAccessToken()
+  if (!token) throw new Error('No autenticado')
+  const resp = await fetch(`/api/conversations?action=add-participant&id=${conversationId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ user_id: userId })
+  })
+  if (!resp.ok) {
+    const txt = await resp.text()
+    throw new Error(`Error agregando participante: ${resp.status} ${txt}`)
+  }
+  return resp.json()
+}
+
 // Get user's conversations
 export async function getConversations(userId: string): Promise<Conversation[]> {
   const token = getAccessToken()
