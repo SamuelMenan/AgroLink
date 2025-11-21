@@ -334,3 +334,25 @@ COMMENT ON COLUMN public.conversations.product_id IS 'ID del producto relacionad
 COMMENT ON COLUMN public.messages.content IS 'Contenido del mensaje en texto plano';
 COMMENT ON COLUMN public.messages.content_ciphertext IS 'Contenido cifrado del mensaje (opcional)';
 COMMENT ON COLUMN public.messages.message_type IS 'Tipo de mensaje: text, image, system, quick_request, quick_response';
+
+create or replace function public.create_conversation(product_id uuid, participant_ids uuid[])
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  conv_id uuid;
+  pid uuid;
+begin
+  insert into public.conversations(product_id) values (product_id) returning id into conv_id;
+  foreach pid in array participant_ids loop
+    insert into public.conversation_participants(conversation_id, user_id)
+      values (conv_id, pid)
+      on conflict do nothing;
+  end loop;
+  return conv_id;
+end;
+$$;
+grant execute on function public.create_conversation(uuid, uuid[]) to authenticated;
+comment on function public.create_conversation(uuid, uuid[]) is 'Crea conversación y añade participantes en una sola llamada.';

@@ -74,76 +74,95 @@ export async function createConversation(
       throw new Error('No se pudo obtener el ID del usuario')
     }
     
-    console.log('[createConversation] Datos a enviar:', {
-      buyer_id: currentUserId,
-      seller_id: participantId,
+    console.log('[createConversation] Datos a enviar (RPC create_conversation):', {
       product_id: productId,
+      participant_ids: [currentUserId, participantId],
       initial_message: initialMessage || null
     })
-    
-    const response = await fetch(`${API_BASE}/conversations`, {
+
+    // Paso 1: crear conversación y añadir participantes en una sola llamada RPC
+    const rpcResponse = await fetch(`${API_BASE}/rpc/create_conversation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        buyer_id: currentUserId,
-        seller_id: participantId,
-        product_id: productId,
-        // Only send initial_message if provided (avoid default duplications)
-        ...(initialMessage ? { initial_message: initialMessage } : {})
+        product_id: productId || null,
+        participant_ids: [currentUserId, participantId]
       })
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
+    if (!rpcResponse.ok) {
+      const errorText = await rpcResponse.text()
       let errorData: { error?: string; details?: any; debug?: any } = {}
-      try {
-        errorData = JSON.parse(errorText)
-      } catch {
-        errorData = { error: errorText }
-      }
-      
-      console.error('[createConversation] Error response:', {
-        status: response.status,
-        statusText: response.statusText,
+      try { errorData = JSON.parse(errorText) } catch { errorData = { error: errorText } }
+      console.error('[createConversation] Error RPC create_conversation:', {
+        status: rpcResponse.status,
+        statusText: rpcResponse.statusText,
         errorData,
-        url: `${API_BASE}/conversations`,
-        requestData: {
-          buyer_id: currentUserId,
-          seller_id: participantId,
-          product_id: productId,
-          initial_message: initialMessage || null
-        },
-        tokenLength: token.length,
-        tokenPreview: token.substring(0, 20) + '...',
+        url: `${API_BASE}/rpc/create_conversation`,
+        requestData: { product_id: productId, participant_ids: [currentUserId, participantId] },
         timestamp: new Date().toISOString()
       })
-      
       let errorMessage = 'Error al crear la conversación'
-      if (response.status === 403) {
+      if (rpcResponse.status === 403) {
         errorMessage = errorData.debug?.message || 'No tienes permisos para crear esta conversación. Por favor, verifica que estás autenticado.'
-      } else if (response.status === 401) {
+      } else if (rpcResponse.status === 401) {
         errorMessage = errorData.debug?.message || 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
-      } else if (response.status === 500) {
+      } else if (rpcResponse.status === 500) {
         errorMessage = 'Error interno del servidor. Por favor, intenta nuevamente más tarde.'
       } else if (errorData.error) {
         errorMessage = errorData.error
       }
-      
       throw new Error(errorMessage)
     }
 
-    return response.json()
+    const conversationId = await rpcResponse.json() // función devuelve UUID
+
+    // Paso 2: si hay mensaje inicial, enviarlo
+    if (initialMessage) {
+      const msgResp = await fetch(`${API_BASE}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          sender_id: currentUserId,
+          content: initialMessage
+        })
+      })
+      if (!msgResp.ok) {
+        const errTxt = await msgResp.text()
+        console.warn('[createConversation] Conversación creada pero fallo al enviar mensaje inicial', {
+          conversation_id: conversationId,
+          status: msgResp.status,
+          error: errTxt
+        })
+      }
+    }
+
+    // Devolver objeto conversación mínimamente estructurado
+    return {
+      id: conversationId,
+      product_id: productId || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      participants: [currentUserId, participantId]
+    } as unknown as Conversation
   }
-  
-  // Handle legacy interface
-  const response = await fetch(`${API_BASE}/conversations`, {
+  // Handle legacy interface (sin RPC, conservar por compatibilidad original)
+  const legacyToken = getAccessToken()
+  if (!legacyToken) {
+    throw new Error('No autenticado')
+  }
+  const legacyResponse = await fetch(`${API_BASE}/conversations`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getAccessToken()}`
+      'Authorization': `Bearer ${legacyToken}`
     },
     body: JSON.stringify({
       buyer_id: buyerIdOrParams,
@@ -153,12 +172,10 @@ export async function createConversation(
       product_image: productImage
     })
   })
-
-  if (!response.ok) {
+  if (!legacyResponse.ok) {
     throw new Error('Error al crear la conversación')
   }
-
-  return response.json()
+  return legacyResponse.json()
 }
 
 // Add a participant (seller) when seller_pending is true
