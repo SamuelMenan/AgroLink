@@ -4,7 +4,6 @@ import { addToCart } from '../services/cartService'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalProduct } from '../services/productService'
-import { MessageCircle } from 'lucide-react'
 
 import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
 import { MessageSellerModal } from '../components/MessageSellerModal'
@@ -348,18 +347,20 @@ function ProductCard({ p, userLat, userLng }: { p: Product, userLat?: number, us
         <div className="mt-4 space-y-3">
           {err && <p className="text-xs text-red-600" role="alert">{err}</p>}
           
-          {/* Message Seller Button - New */}
+          {/* Message Seller Button - Messenger Style */}
           <button 
             onClick={() => setIsMessageModalOpen(true)} 
             disabled={p.stock_available === false}
-            className={`w-full rounded-md border px-3 py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+            className={`w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
               p.stock_available === false
                 ? 'border-gray-300 bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white'
+                : 'border-blue-500 text-blue-600 hover:bg-blue-50'
             }`}
             aria-label={`Enviar mensaje al vendedor de ${p.name}`}
           >
-            <MessageCircle className="w-4 h-4" />
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.477 2 2 6.145 2 11.243c0 2.905 1.463 5.499 3.75 7.189V22l3.427-1.88c.915.253 1.856.38 2.823.38 5.523 0 10-4.145 10-9.257S17.523 2 12 2zm.995 12.468l-2.567-2.736-5.01 2.736 5.51-5.844 2.628 2.736 4.949-2.736-5.51 5.844z"/>
+            </svg>
             Enviar mensaje al vendedor
           </button>
           

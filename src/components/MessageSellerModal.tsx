@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, X } from 'lucide-react'
+import { Send } from 'lucide-react'
 
 interface MessageSellerModalProps {
   isOpen: boolean
@@ -13,11 +13,9 @@ interface MessageSellerModalProps {
 export function MessageSellerModal({ 
   isOpen, 
   onClose, 
-  sellerName, 
-  productName, 
   onSendMessage 
 }: MessageSellerModalProps) {
-  const [message, setMessage] = useState(`Hola, ¿sigue disponible el ${productName}?`)
+  const [message, setMessage] = useState(`Hola, Eli. ¿Sigue disponible?`)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,7 +38,7 @@ export function MessageSellerModal({
   }
 
   const handleClose = () => {
-    setMessage(`Hola, ¿sigue disponible el ${productName}?`)
+    setMessage(`Hola, Eli. ¿Sigue disponible?`)
     setError(null)
     onClose()
   }
@@ -55,78 +53,59 @@ export function MessageSellerModal({
         onClick={handleClose}
       />
       
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full">
+      {/* Modal - Dark Theme */}
+      <div className="relative bg-gray-900 rounded-xl shadow-xl max-w-md w-full border border-gray-700">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <Send className="w-4 h-4 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Envía un mensaje al vendedor
-            </h3>
+        <div className="flex items-center gap-3 p-4">
+          {/* Messenger-style blue circle icon */}
+          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.477 2 2 6.145 2 11.243c0 2.905 1.463 5.499 3.75 7.189V22l3.427-1.88c.915.253 1.856.38 2.823.38 5.523 0 10-4.145 10-9.257S17.523 2 12 2zm.995 12.468l-2.567-2.736-5.01 2.736 5.51-5.844 2.628 2.736 4.949-2.736-5.51 5.844z"/>
+            </svg>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-            aria-label="Cerrar"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <h3 className="text-base font-medium text-gray-100">
+            Envía un mensaje al vendedor
+          </h3>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="p-4">
+        <form onSubmit={handleSubmit} className="p-4 pt-0">
           <div className="mb-4">
-            <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-              Para: {sellerName}
-            </label>
             <textarea
               id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Escribe tu mensaje..."
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              rows={3}
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
               disabled={isSending}
             />
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="mb-4 p-3 bg-red-900 border border-red-700 rounded-lg">
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
-          {/* Footer */}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              disabled={isSending}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!message.trim() || isSending}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            >
-              {isSending ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Enviar
-                </>
-              )}
-            </button>
-          </div>
+          {/* Footer - Full width button */}
+          <button
+            type="submit"
+            disabled={!message.trim() || isSending}
+            className="w-full py-3 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            {isSending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Enviar
+              </>
+            )}
+          </button>
         </form>
       </div>
     </div>,
