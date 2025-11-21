@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { messagingService } from '../services/messagingService';
-import { 
+import type { 
   Conversation, 
   Message, 
   MessagingEvent, 

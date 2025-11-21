@@ -1,4 +1,4 @@
-import { 
+import type { 
   Message, 
   Conversation, 
   SendMessageRequest, 
@@ -26,7 +26,7 @@ export class MessagingService {
   private messageQueue: Message[] = [];
   private retryAttempts = 0;
   private maxRetries = 3;
-  private reconnectTimeout?: NodeJS.Timeout;
+  private reconnectTimeout?: number;
 
   constructor() {
     // Reset state for testing
@@ -261,9 +261,7 @@ export class MessagingService {
   private queueMessage(request: SendMessageRequest): void {
     const queuedMessage: Message = {
       id: `queued-${Date.now()}-${Math.random()}`,
-      conversationId: request.conversationId,
       senderId: 'current-user', // This should be set from auth context
-      content: request.content,
       createdAt: new Date().toISOString(),
       status: 'failed',
       ...request
@@ -305,7 +303,7 @@ export class MessagingService {
       if (this.messageQueue.length > 0) {
         setTimeout(() => this.processMessageQueue(), 100);
       }
-    } catch (error) {
+    } catch {
       this.retryAttempts++;
       
       // Exponential backoff
@@ -349,3 +347,15 @@ export class MessagingService {
 
 // Export singleton instance
 export const messagingService = MessagingService.getInstance();
+
+/**
+ * Contact a user - helper function
+ */
+export async function contactUser(userId: string, productId?: string): Promise<Conversation> {
+  const service = MessagingService.getInstance()
+  return service.createConversation({
+    participantIds: [userId],
+    type: 'direct',
+    metadata: productId ? { productId } : undefined
+  })
+}

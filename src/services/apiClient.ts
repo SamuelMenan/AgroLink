@@ -346,3 +346,30 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   console.error('[apiFetch] request failed after retries', { path, lastUrlTried, error })
   throw error
 }
+
+// Export apiClient object for compatibility
+export const apiClient = {
+  get: async <T>(path: string): Promise<T> => {
+    const res = await apiFetch(path)
+    return res.json()
+  },
+  post: async <T>(path: string, body?: unknown): Promise<T> => {
+    const res = await apiFetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    })
+    return res.json()
+  },
+  put: async <T>(path: string, body?: unknown): Promise<T> => {
+    const res = await apiFetch(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    })
+    return res.json()
+  },
+  delete: async (path: string): Promise<void> => {
+    await apiFetch(path, { method: 'DELETE' })
+  }
+}

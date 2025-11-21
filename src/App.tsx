@@ -15,7 +15,7 @@ import MyProducts from './pages/products/MyProducts'
 import EditProduct from './pages/products/EditProduct'
 // RealtimeNotifications eliminado en migración a backend-only.
 import NotificationsPage from './pages/notifications/NotificationsPage'
-import Messages from './pages/messages/Messages'
+import Messages from './pages/messages/Messaging'
 import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'

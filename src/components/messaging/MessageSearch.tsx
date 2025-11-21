@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, Filter, Calendar, User, X } from 'lucide-react';
-import { MessageSearchFilters } from '../../types/messaging';
+import type { MessageSearchFilters } from '../../types/messaging';
 
 interface MessageSearchProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Search, Users } from 'lucide-react';
-import { CreateConversationRequest } from '../../types/messaging';
+import { X, Search } from 'lucide-react';
+import type { CreateConversationRequest } from '../../types/messaging';
 
 interface NewConversationModalProps {
   isOpen: boolean;

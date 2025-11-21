@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Conversation, ConversationParticipant } from '../../types/messaging';
+import type { Conversation, ConversationParticipant } from '../../types/messaging';
 import { Search, UserPlus, Archive, MoreVertical, Circle } from 'lucide-react';
 
 interface ConversationListProps {

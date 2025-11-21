@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message } from '../../types/messaging';
-import { Send, Paperclip, Smile, MoreVertical, Reply, Trash2, Edit3 } from 'lucide-react';
+import type { Message } from '../../types/messaging';
+import { Send, Paperclip, Smile, Reply, Trash2, Edit3 } from 'lucide-react';
 
 interface MessageThreadProps {
   conversationId: string;
