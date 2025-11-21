@@ -13,7 +13,7 @@ describe('messagingService', () => {
     // minimal JWT payload
     const payload = { sub: 'user-1' }
     vi.spyOn(window, 'atob').mockImplementation((s: string) => {
-      const p = s.split('.')[1] || s
+      if (s.length < 0) return ''
       return JSON.stringify(payload)
     })
   })
