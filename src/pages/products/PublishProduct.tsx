@@ -28,7 +28,7 @@ export default function PublishProduct() {
         name: values.name.trim(),
         description: values.description.trim(),
         price: finalPrice,
-        quantity: Number(values.quantity),
+        quantity: values.quantity.trim(),
         category: values.category,
         images: values.images,
         location: values.location?.trim() || undefined,

@@ -6,7 +6,7 @@ export type Product = {
   name: string
   description: string
   price: number
-  quantity: number
+  quantity: string  // String to support units like "20 arrobas"
   category: string
   image_urls: string[]
   // Ubicación opcional

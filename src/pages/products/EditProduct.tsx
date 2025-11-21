@@ -38,7 +38,7 @@ export default function EditProduct() {
         name: values.name.trim(),
         description: values.description.trim(),
         price: Number(values.price),
-        quantity: Number(values.quantity),
+        quantity: values.quantity.trim(),
         category: values.category,
         image_urls,
         location: values.location?.trim() || undefined,

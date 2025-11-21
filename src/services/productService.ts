@@ -10,7 +10,7 @@ type CreateInput = {
   name: string
   description: string
   price: number
-  quantity: number
+  quantity: string  // String to support units like "20 arrobas"
   category: string
   images: File[]
   location?: string
