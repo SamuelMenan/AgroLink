@@ -193,26 +193,66 @@ export function formatAgriculturalValue(value: number, unit: string, decimals: n
 
 // Parse agricultural input (handle both unit names and symbols)
 export function parseAgriculturalInput(input: string): { value: number; unit: string } | null {
-  const trimmed = input.trim()
+  const trimmed = input.trim().toLowerCase()
   
-  // Try to match value and unit
-  const match = trimmed.match(/^([0-9.,]+)\s*([a-zA-Z²°@#]+)$/)
+  // Try to match value and unit with more flexible patterns
+  const match = trimmed.match(/^([0-9.,]+)\s*([a-záéíóúñü²°@#]+)$/)
   if (match) {
     const value = parseFloat(match[1].replace(',', '.'))
-    const unitSymbol = match[2].toLowerCase()
+    const unitText = match[2]
+    
+    // Map of common unit variations
+    const unitVariations: Record<string, string> = {
+      'kilo': 'kg',
+      'kilos': 'kg',
+      'kilogramo': 'kg',
+      'kilogramos': 'kg',
+      'arroba': 'arroba',
+      'arrobas': 'arroba',
+      '@': 'arroba',
+      'libra': 'libra',
+      'libras': 'libra',
+      'lb': 'libra',
+      'fanega': 'fanega',
+      'fanegas': 'fanega',
+      'quintal': 'quintal',
+      'quintales': 'quintal',
+      'qq': 'quintal',
+      'tonelada': 'tonelada',
+      'toneladas': 'tonelada',
+      't': 'tonelada',
+      'litro': 'l',
+      'litros': 'l',
+      'l': 'l',
+      'galón': 'galón',
+      'galones': 'galón',
+      'gal': 'galón',
+      'hectárea': 'hectárea',
+      'hectáreas': 'hectárea',
+      'ha': 'hectárea',
+      'docena': 'docena',
+      'docenas': 'docena',
+      'unidad': 'unidad',
+      'unidades': 'unidad'
+    }
+    
+    const unit = unitVariations[unitText]
+    if (unit) {
+      return { value, unit }
+    }
     
     // Find unit by symbol
     const unitEntry = Object.entries(AGRICULTURAL_UNIT_SYMBOLS).find(([_, symbol]) => 
-      symbol.toLowerCase() === unitSymbol
+      symbol.toLowerCase() === unitText
     )
     
     if (unitEntry) {
       return { value, unit: unitEntry[0] }
     }
     
-    // Try direct unit name
+    // Try direct unit name from conversions
     const conversion = AGRICULTURAL_CONVERSIONS.find(c => 
-      c.from.toLowerCase() === unitSymbol || c.to.toLowerCase() === unitSymbol
+      c.from.toLowerCase() === unitText || c.to.toLowerCase() === unitText
     )
     
     if (conversion) {

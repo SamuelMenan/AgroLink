@@ -28,8 +28,10 @@ export function validateProductForm(values: ProductFormValues): Partial<Record<k
     }
   }
   
-  const qtyNum = Number(values.quantity)
-  if (!values.quantity || Number.isNaN(qtyNum) || qtyNum < 0) errors.quantity = 'Cantidad numérica válida.'
+  // Quantity validation - accept text with units
+  if (!values.quantity || !values.quantity.trim()) {
+    errors.quantity = 'La cantidad es obligatoria.'
+  }
   
   if (!values.category) errors.category = 'Selecciona una categoría.'
   
