@@ -360,20 +360,40 @@ export default async function handler(req, res) {
     // ================= SUB-ACTIONS =================
     } else if (action === 'messages') {
       if (!targetId) return res.status(400).json({ error: 'id requerido (conversation id)' })
+      
+      // Validate conversation ID format (UUID)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(targetId)) {
+        console.error('[conversations] Invalid conversation ID format:', targetId)
+        return res.status(400).json({ 
+          error: 'Formato de ID de conversación inválido',
+          details: 'El ID debe ser un UUID válido',
+          received_id: targetId
+        })
+      }
+      
       if (req.method === 'GET') {
         try {
           // Verify participant
           const participantCheckUrl = `${SUPABASE_URL}/rest/v1/conversation_participants?conversation_id=eq.${targetId}&select=user_id`
+          console.log('[conversations] Checking participant access for conversation:', targetId)
           const partResp = await fetch(participantCheckUrl, {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
           })
           if (!partResp.ok) {
-            console.error('[conversations] Participant verification failed:', partResp.status, await partResp.text())
-            return res.status(partResp.status).json({ error: 'Error al verificar participante', details: await partResp.text() })
+            const errorText = await partResp.text()
+            console.error('[conversations] Participant verification failed:', partResp.status, errorText)
+            return res.status(partResp.status).json({ error: 'Error al verificar participante', details: errorText })
           }
           const partJson = await partResp.json()
+          console.log('[conversations] Participant check result:', { count: partJson.length, participants: partJson })
+          
           if (!Array.isArray(partJson) || partJson.length === 0) {
-            return res.status(403).json({ error: 'No eres participante de esta conversación' })
+            return res.status(403).json({ 
+              error: 'No eres participante de esta conversación',
+              details: 'Usuario no autorizado para acceder a esta conversación',
+              conversation_id: targetId
+            })
           }
           
           // Get messages with proper error handling
@@ -385,12 +405,31 @@ export default async function handler(req, res) {
           
           if (!msgResp.ok) {
             const errorText = await msgResp.text()
-            console.error('[conversations] Messages fetch failed:', msgResp.status, errorText)
-            return res.status(msgResp.status).json({ error: 'Error al obtener mensajes', details: errorText })
+            console.error('[conversations] Messages fetch failed:', {
+              status: msgResp.status,
+              statusText: msgResp.statusText,
+              errorText,
+              conversationId: targetId
+            })
+            return res.status(msgResp.status).json({ 
+              error: 'Error al obtener mensajes', 
+              details: errorText,
+              conversation_id: targetId
+            })
           }
           
-          const raw = await msgResp.json()
-          console.log('[conversations] Raw messages response:', raw)
+          let raw
+          try {
+            raw = await msgResp.json()
+            console.log('[conversations] Raw messages response:', raw)
+          } catch (parseError) {
+            console.error('[conversations] Failed to parse messages JSON:', parseError)
+            return res.status(500).json({ 
+              error: 'Error al procesar respuesta de mensajes',
+              details: 'Respuesta inválida del servidor',
+              conversation_id: targetId
+            })
+          }
           
           // Ensure we always return an array, even if response is malformed
           const messagesArray = Array.isArray(raw) ? raw : []

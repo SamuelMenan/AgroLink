@@ -386,37 +386,18 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 
     // Debug log for response
     console.log('[getMessages] Response status:', response.status)
-    if (response.ok) {
-      const data = await response.json()
-      console.log('[getMessages] Messages received:', data.length)
-      data.forEach((msg: Message, i: number) => {
-        console.log(`[getMessages] Message ${i}:`, {
-          id: msg.id,
-          sender_id: msg.sender_id,
-          sender_name: msg.sender_name,
-          content: msg.content.substring(0, 50)
-        })
-      })
-      // Ensure we always return an array
-      return Array.isArray(data) ? data : []
-    }
-
+    
+    // Handle non-OK responses first
     if (!response.ok) {
       const errorText = await response.text()
-      let errorData: { error?: string } = {}
-      try {
-        errorData = JSON.parse(errorText)
-      } catch {
-        errorData = { error: errorText }
-      }
-      
       console.error('[getMessages] Error response:', {
         status: response.status,
         statusText: response.statusText,
-        errorData,
+        errorText,
         url: `${API_BASE}/conversations?action=messages&id=${conversationId}`
       })
       
+      // Handle 403 with participant retry logic
       if (response.status === 403 && /No eres participante/i.test(errorText)) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]))
@@ -433,7 +414,9 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
               return Array.isArray(retryData) ? retryData : []
             }
           }
-        } catch {}
+        } catch (retryError) {
+          console.error('[getMessages] Retry failed:', retryError)
+        }
       }
 
       // Return empty array for non-critical errors instead of throwing
@@ -442,25 +425,40 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
         return []
       }
 
-      let errorMessage = 'Error al obtener mensajes'
-      if (response.status === 401) {
-        errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
-      } else if (response.status === 404) {
-        errorMessage = 'La conversación no existe o fue eliminada.'
-      } else if (errorData.error) {
-        errorMessage = errorData.error
-      }
-      
-      throw new Error(errorMessage)
-    }
-
-    try {
-      const data = await response.json()
-      return Array.isArray(data) ? data : []
-    } catch (e) {
-      console.error('[getMessages] Failed to parse JSON response:', e)
+      // For other errors, return empty array to prevent .map() errors
+      console.warn('[getMessages] Returning empty array due to error status:', response.status)
       return []
     }
+
+    // Handle OK response
+    if (response.ok) {
+      try {
+        const data = await response.json()
+        console.log('[getMessages] Messages received:', Array.isArray(data) ? data.length : 'invalid format')
+        
+        if (Array.isArray(data)) {
+          data.forEach((msg: Message, i: number) => {
+            console.log(`[getMessages] Message ${i}:`, {
+              id: msg.id,
+              sender_id: msg.sender_id,
+              sender_name: msg.sender_name,
+              content: msg.content?.substring(0, 50) || 'no content'
+            })
+          })
+          return data
+        } else {
+          console.warn('[getMessages] Response is not an array, returning empty array')
+          return []
+        }
+      } catch (parseError) {
+        console.error('[getMessages] Failed to parse JSON response:', parseError)
+        return []
+      }
+    }
+
+    // Fallback - should not reach here, but return empty array just in case
+    console.warn('[getMessages] Fallback - returning empty array')
+    return []
   } catch (error) {
     console.error('[getMessages] Unexpected error:', error)
     return []
