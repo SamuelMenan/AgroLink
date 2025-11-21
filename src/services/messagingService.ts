@@ -442,20 +442,23 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
     })
 
     // Debug log for response
-    console.log('[getMessages] Response status:', response.status)
-    
-    // Handle non-OK responses first
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[getMessages] Error response:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText,
-        url: `${API_BASE}/conversations?action=messages&id=${conversationId}`
-      })
+      console.log('[getMessages] Response status:', response.status)
+      
+      // Handle non-OK responses first
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[getMessages] Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText,
+          url: `${API_BASE}/conversations?action=messages&id=${conversationId}`,
+          conversationId,
+          tokenPresent: !!token
+        })
       
       // Handle 403 with participant retry logic
-      if (response.status === 403 && /No eres participante/i.test(errorText)) {
+      if (response.status === 403 && (/No eres participante/i.test(errorText) || /No tienes acceso/i.test(errorText))) {
+        console.log('[getMessages] User is not participant, attempting to add...')
         try {
           const payload = JSON.parse(atob(token.split('.')[1]))
           const currentUserId = payload.sub || payload.user_id || payload.id

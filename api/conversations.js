@@ -430,16 +430,28 @@ export default async function handler(req, res) {
       
       if (req.method === 'GET') {
         try {
-          // Verify participant
-          const participantCheckUrl = `${SUPABASE_URL}/rest/v1/conversation_participants?conversation_id=eq.${targetId}&select=user_id`
-          console.log('[conversations] Checking participant access for conversation:', targetId)
+          // Verify participant - check if current user is participant in this conversation
+          const participantCheckUrl = `${SUPABASE_URL}/rest/v1/conversation_participants?conversation_id=eq.${targetId}&user_id=eq.${authUserId}&select=user_id`
+          console.log('[conversations] Checking participant access for conversation:', targetId, 'user:', authUserId)
           const partResp = await fetch(participantCheckUrl, {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
           })
           if (!partResp.ok) {
             const errorText = await partResp.text()
-            console.error('[conversations] Participant verification failed:', partResp.status, errorText)
-            return res.status(partResp.status).json({ error: 'Error al verificar participante', details: errorText })
+            console.error('[conversations] Participant verification failed:', {
+              status: partResp.status,
+              errorText,
+              conversationId: targetId,
+              userId: authUserId,
+              url: participantCheckUrl
+            })
+            // Return 403 instead of the original status for better UX
+            return res.status(403).json({ 
+              error: 'No tienes acceso a esta conversación',
+              details: 'Usuario no autorizado para acceder a esta conversación',
+              conversation_id: targetId,
+              user_id: authUserId
+            })
           }
           const partJson = await partResp.json()
           console.log('[conversations] Participant check result:', { count: partJson.length, participants: partJson })
@@ -448,15 +460,22 @@ export default async function handler(req, res) {
             return res.status(403).json({ 
               error: 'No eres participante de esta conversación',
               details: 'Usuario no autorizado para acceder a esta conversación',
-              conversation_id: targetId
+              conversation_id: targetId,
+              user_id: authUserId
             })
           }
           
           // Get messages with proper error handling
-          const messagesUrl = `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${targetId}&order=created_at.asc&select=*,sender:sender_id(id,full_name)`
+          // Fix: Use correct field reference for sender - sender_id is the field name
+          const messagesUrl = `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${targetId}&order=created_at.asc&select=*`
           console.log('[conversations] Fetching messages from:', messagesUrl)
           const msgResp = await fetch(messagesUrl, {
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${userToken}`, 'Content-Type': 'application/json' }
+            headers: { 
+              'apikey': SUPABASE_ANON_KEY, 
+              'Authorization': `Bearer ${userToken}`, 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
           })
           
           if (!msgResp.ok) {
@@ -465,12 +484,18 @@ export default async function handler(req, res) {
               status: msgResp.status,
               statusText: msgResp.statusText,
               errorText,
-              conversationId: targetId
+              conversationId: targetId,
+              userId: authUserId,
+              headers: {
+                hasAuth: !!userToken,
+                tokenLength: userToken?.length
+              }
             })
             return res.status(msgResp.status).json({ 
               error: 'Error al obtener mensajes', 
               details: errorText,
-              conversation_id: targetId
+              conversation_id: targetId,
+              user_id: authUserId
             })
           }
           
@@ -489,12 +514,8 @@ export default async function handler(req, res) {
           
           // Ensure we always return an array, even if response is malformed
           const messagesArray = Array.isArray(raw) ? raw : []
-          const enriched = messagesArray.map(m => ({
-            ...m,
-            sender_name: m.sender?.full_name || null
-          }))
-          console.log('[conversations] Returning enriched messages:', enriched.length)
-          return res.status(200).json(enriched)
+          console.log('[conversations] Returning messages:', messagesArray.length)
+          return res.status(200).json(messagesArray)
         } catch (error) {
           console.error('[conversations] Error in messages action:', error)
           return res.status(500).json({ error: 'Error interno al obtener mensajes', details: error.message })
