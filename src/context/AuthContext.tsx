@@ -8,7 +8,7 @@ type AuthContextValue = {
   user: User | null
   loading: boolean
   signOut: () => Promise<void>
-  signUpWithEmail: (params: { fullName: string; email: string; password: string; phone?: string }) => Promise<{ error?: string }>
+  signUpWithEmail: (params: { fullName: string; email: string; password: string; phone?: string; captchaToken?: string }) => Promise<{ error?: string }>
   signInWithEmail: (params: { email: string; password: string }) => Promise<{ error?: string }>
   signInWithCredentials: (params: { identifier: string; password: string; captchaToken?: string }) => Promise<{ error?: string }>
   signInWithGoogle: (redirectTo?: string) => Promise<void>
@@ -75,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
  * @param password - Contraseña del usuario
  * @param phone - Teléfono del usuario (opcional si se proporciona email)
  */
-  const signUpWithEmail: AuthContextValue['signUpWithEmail'] = async ({ fullName, email, password, phone }) => {
+  const signUpWithEmail: AuthContextValue['signUpWithEmail'] = async ({ fullName, email, password, phone, captchaToken }) => {
     try {
-      const resp = await signUp(fullName, email, password, phone)
+      const resp = await signUp(fullName, email, password, phone, captchaToken)
       const u = deriveUserFromTokens(resp)
       
       // Si hay un usuario válido, establecerlo (considerar autenticado si existen tokens)
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Supabase no devolvió tokens (probable confirmación activada o respuesta parcial)
         console.warn('[AuthContext] Supabase no devolvió tokens en sign-up. Intentando sign-in inmediato.')
         try {
-          const signinResp = await signInEmail(email, password)
+          const signinResp = await signInEmail(email, password, captchaToken)
           const u2 = deriveUserFromTokens(signinResp)
           if (u2) setUser(u2)
         } catch (signinErr) {
