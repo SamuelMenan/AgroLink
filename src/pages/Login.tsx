@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import CaptchaGate from '../components/CaptchaGate'
@@ -17,6 +18,8 @@ export default function Login() {
   const [captchaOk, setCaptchaOk] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [showPwd, setShowPwd] = useState(false)
+  const { executeRecaptcha } = useGoogleReCaptcha()
+  const forceDisableCaptcha = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_RECAPTCHA_FORCE_DISABLE === 'true'
 
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/simple'
@@ -37,10 +40,24 @@ export default function Login() {
       setFormError('Ingresa tu correo/teléfono y contraseña.')
       return
     }
-    // si hay sitekey configurado (hCaptcha o reCAPTCHA), requiere captcha
-    if ((import.meta.env.VITE_HCAPTCHA_SITEKEY || import.meta.env.VITE_RECAPTCHA_SITE_KEY) && !captchaOk) {
-      setFormError('Completa la verificación de seguridad.')
-      return
+    // si hay sitekey configurado, genera token fresco antes de enviar
+    try {
+      const siteKeySet = !!(import.meta.env.VITE_RECAPTCHA_SITE_KEY)
+      if (siteKeySet && !forceDisableCaptcha && executeRecaptcha) {
+        const freshToken = await executeRecaptcha('login')
+        if (freshToken) {
+          setCaptchaToken(freshToken)
+          setCaptchaOk(true)
+        } else {
+          setFormError('No se pudo validar reCAPTCHA. Intenta nuevamente.')
+          return
+        }
+      }
+    } catch {
+      if (!forceDisableCaptcha) {
+        setFormError('Error generando token de seguridad. Intenta nuevamente.')
+        return
+      }
     }
     setSubmitting(true)
     try {

@@ -650,15 +650,10 @@ export default async function handler(req, res) {
         }
         const messageData = {
           conversation_id,
-            sender_id,
-            content,
-            message_type: type || 'message',
-            is_from_buyer: is_from_buyer ?? null,
-            quick_request_type: quick_request_type || null,
-            quick_response_type: quick_response_type || null,
-            in_reply_to: in_reply_to || null
+          sender_id,
+          content,
+          message_type: type || 'text'
         }
-        Object.keys(messageData).forEach(k => { if (messageData[k] === null) delete messageData[k] })
         const msgUrl = `${SUPABASE_URL}/rest/v1/messages`
         const msgResp = await fetch(msgUrl, {
           method: 'POST',

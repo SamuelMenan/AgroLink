@@ -25,6 +25,7 @@ import { Messages } from './pages/Messages'
 
 function App() {
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
+  const forceDisable = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_RECAPTCHA_FORCE_DISABLE === 'true'
 
   const appContent = (
     <ErrorBoundary>
@@ -57,9 +58,9 @@ function App() {
     </ErrorBoundary>
   )
 
-  if (siteKey) {
+  if (siteKey && !forceDisable) {
     return (
-      <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
+      <GoogleReCaptchaProvider reCaptchaKey={siteKey} useRecaptchaNet scriptProps={{ async: true, defer: true }}>
         {appContent}
       </GoogleReCaptchaProvider>
     )

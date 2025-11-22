@@ -95,15 +95,19 @@ function fetchWithTimeout(fetchImpl: FetchLike, input: RequestInfo | URL, init: 
   return fetchImpl(input, merged).finally(() => clearTimeout(id))
 }
 
-async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string) {
-  // Best effort: ping health endpoints to wake Render. Ignore errors.
+let warmupRan = false
+async function warmupBackend(fetchImpl: FetchLike, proxyUrlBase: string, isProd: boolean, force = false) {
+  if (warmupRan && !force) return
   try {
     await fetchImpl(`${proxyUrlBase}/actuator/health`, { cache: 'no-store' })
-    await new Promise(r => setTimeout(r, 500)) // Give it time to stabilize
+    await new Promise(r => setTimeout(r, 500))
   } catch { /* ignore */ }
-  try {
-    await fetchImpl(`/api/warm`, { cache: 'no-store' })
-  } catch { /* ignore */ }
+  if (isProd) {
+    try {
+      await fetchImpl(`/api/warm`, { cache: 'no-store' })
+    } catch { /* ignore */ }
+  }
+  warmupRan = true
 }
 
 // Direct fallback fetch that bypasses the proxy - DISABLED for products to avoid CORS
@@ -157,7 +161,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
   }
 
   const directUrl = `${BASE_URL}${path}`
-  const shouldProxy = path.startsWith('/api/v1') || path.startsWith('/api/proxy')
+  const isProd = import.meta.env.PROD
+  const shouldProxy = isProd && (path.startsWith('/api/v1') || path.startsWith('/api/proxy'))
   const proxiedPath = path.startsWith('/api/proxy')
     ? path
     : (shouldProxy
@@ -189,7 +194,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Primary attempt: use proxy for versioned backend endpoints; otherwise same-origin
+      // Primary attempt: use proxy in PROD; in DEV access 
       const primary = proxyUrl
       lastUrlTried = primary
       
@@ -272,7 +277,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         // Enhanced retry with exponential backoff and pre-warming
         const backoffMs = calculateBackoff(attempt, 600)
         console.warn(`[apiFetch] Retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path} (status: ${res.status})`)
-        await warmupBackend(fetchImpl, '/api/proxy')
+        await warmupBackend(fetchImpl, isProd ? '/api/proxy' : '/api', isProd)
         await sleep(backoffMs)
         continue
       }
@@ -327,7 +332,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
         // Enhanced retry for network/timeout errors
         const backoffMs = calculateBackoff(attempt, 700)
         console.warn(`[apiFetch] Network retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${path}`, e)
-        await warmupBackend(fetchImpl, '/api/proxy')
+        await warmupBackend(fetchImpl, isProd ? '/api/proxy' : '/api', isProd)
         await sleep(backoffMs)
         continue
       }
@@ -345,7 +350,12 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     error.message = `${error.message} (Service circuit breaker is open - too many failures)`
   }
   
-  try { fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, error: (error as Error).message }) }) } catch {
+  try {
+    const enableMetrics = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_ENABLE_METRICS
+    if (enableMetrics === 'true') {
+      fetch('/api/metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: Date.now(), path, url: lastUrlTried, error: (error as Error).message }) })
+    }
+  } catch {
     // Silently ignore metrics errors
   }
   console.error('[apiFetch] request failed after retries', { path, lastUrlTried, error })

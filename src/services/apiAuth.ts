@@ -63,7 +63,9 @@ function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs
 
 async function warmupProxy() {
   try {
-    await fetch('/api/proxy/actuator/health', { cache: 'no-store' })
+    const isProd = import.meta.env.PROD
+    const path = isProd ? '/api/proxy/actuator/health' : '/api/actuator/health'
+    await fetch(path, { cache: 'no-store' })
     await new Promise(r => setTimeout(r, 200))
   } catch { /* ignore */ }
 }
@@ -71,7 +73,8 @@ async function warmupProxy() {
 async function post(path: string, body: PostBody): Promise<BackendAuthResponse> {
   // Compute URLs: serverless (/api/*) stays same-origin; backend paths go via /api/proxy
   const isServerless = path.startsWith('/api/')
-  const proxiedPath = path.startsWith('/api/proxy') ? path : (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
+  const isProd = import.meta.env.PROD
+  const proxiedPath = path.startsWith('/api/proxy') ? path : (isProd && !isServerless ? (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`) : path)
   const proxyUrl = isServerless ? path : proxiedPath
   const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
 
@@ -289,6 +292,11 @@ async function supabaseSignInFallback(params: { email?: string; phone?: string; 
   return JSON.parse(text) as BackendAuthResponse;
 }
 
+function hasSupabaseEnv(): boolean {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env
+  return !!(env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY)
+}
+
 export async function signUp(fullName: string, email: string, password: string, phone?: string, captchaToken?: string) {
   // Support phone-only registration - backend will generate email if needed
   const basePayload: Record<string, unknown> = { password, data: { full_name: fullName } };
@@ -338,21 +346,27 @@ export async function signInEmail(email: string, password: string, captchaToken?
     const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|502|503|504/i.test(msg);
     if (!isInfra) throw err;
     // Fallback directo a Supabase para completar login en caso de cold start/5xx
-    try {
-      const fb = await supabaseSignInFallback({ email, password });
-      if (fb.access_token && fb.refresh_token) setTokens(fb);
-      try { await warmupProxy(); } catch { /* ignore */ }
-      return fb;
-    } catch (fbErr) {
-      const eMsg = (fbErr instanceof Error) ? fbErr.message : String(fbErr);
-      if (/Supabase\s+(400|401)/i.test(eMsg)) {
-        throw new Error('Credenciales inválidas. Verifica tu correo y contraseña.');
+    if (hasSupabaseEnv()) {
+      try {
+        const fb = await supabaseSignInFallback({ email, password });
+        if (fb.access_token && fb.refresh_token) setTokens(fb);
+        try { await warmupProxy(); } catch { /* ignore */ }
+        return fb;
+      } catch (fbErr) {
+        const eMsg = (fbErr instanceof Error) ? fbErr.message : String(fbErr);
+        if (/captcha/i.test(eMsg)) {
+          throw new Error('La verificación de seguridad está activada en el servidor. Configura VITE_RECAPTCHA_SITE_KEY y el mismo site key en Supabase, o desactiva CAPTCHA en Supabase para pruebas.');
+        }
+        if (/Supabase\s+(400|401)/i.test(eMsg)) {
+          throw new Error('Credenciales inválidas. Verifica tu correo y contraseña.');
+        }
+        if (/Supabase\s+429|Too\s+Many|rate\s*limit/i.test(eMsg)) {
+          throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.');
+        }
+        throw fbErr;
       }
-      if (/Supabase\s+429|Too\s+Many|rate\s*limit/i.test(eMsg)) {
-        throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.');
-      }
-      throw fbErr;
     }
+    throw err;
   }
 }
 
@@ -368,21 +382,27 @@ export async function signInPhone(phone: string, password: string, captchaToken?
     const msg = (err instanceof Error) ? err.message : String(err);
     const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|502|503|504/i.test(msg);
     if (!isInfra) throw err;
-    try {
-      const fb = await supabaseSignInFallback({ phone, password });
-      if (fb.access_token && fb.refresh_token) setTokens(fb);
-      try { await warmupProxy(); } catch { /* ignore */ }
-      return fb;
-    } catch (fbErr) {
-      const eMsg = (fbErr instanceof Error) ? fbErr.message : String(fbErr);
-      if (/Supabase\s+(400|401)/i.test(eMsg)) {
-        throw new Error('Credenciales inválidas. Verifica tu teléfono y contraseña.');
+    if (hasSupabaseEnv()) {
+      try {
+        const fb = await supabaseSignInFallback({ phone, password });
+        if (fb.access_token && fb.refresh_token) setTokens(fb);
+        try { await warmupProxy(); } catch { /* ignore */ }
+        return fb;
+      } catch (fbErr) {
+        const eMsg = (fbErr instanceof Error) ? fbErr.message : String(fbErr);
+        if (/captcha/i.test(eMsg)) {
+          throw new Error('La verificación de seguridad está activada en el servidor. Configura VITE_RECAPTCHA_SITE_KEY y el mismo site key en Supabase, o desactiva CAPTCHA en Supabase para pruebas.');
+        }
+        if (/Supabase\s+(400|401)/i.test(eMsg)) {
+          throw new Error('Credenciales inválidas. Verifica tu teléfono y contraseña.');
+        }
+        if (/Supabase\s+429|Too\s+Many|rate\s*limit/i.test(eMsg)) {
+          throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.');
+        }
+        throw fbErr;
       }
-      if (/Supabase\s+429|Too\s+Many|rate\s*limit/i.test(eMsg)) {
-        throw new Error('Demasiados intentos. Intenta nuevamente en unos minutos.');
-      }
-      throw fbErr;
     }
+    throw err;
   }
 }
 
@@ -400,19 +420,21 @@ export async function refreshSession() {
   } catch (primaryErr) {
     console.error('[apiAuth] refresh via backend failed', primaryErr)
     // Fallback final: invocar directamente a Supabase si se configuraron variables en frontend
-    try {
-      const supabaseResp = await supabaseRefreshFallback(rt);
-      if (supabaseResp.access_token && supabaseResp.refresh_token) setTokens(supabaseResp);
-      console.info('[apiAuth] refreshSession: usado fallback directo a Supabase');
-      return supabaseResp;
-    } catch (fallbackErr) {
-      console.error('[apiAuth] Supabase fallback failed', fallbackErr);
-      // Si el fallback también falla, devolver el error original con detalle del fallback
-      const combined = new Error(
-        `Refresh failed via backend: ${(primaryErr as Error).message}. Fallback to Supabase failed: ${(fallbackErr as Error).message}`
-      );
-      throw combined;
+    if (hasSupabaseEnv()) {
+      try {
+        const supabaseResp = await supabaseRefreshFallback(rt);
+        if (supabaseResp.access_token && supabaseResp.refresh_token) setTokens(supabaseResp);
+        console.info('[apiAuth] refreshSession: usado fallback directo a Supabase');
+        return supabaseResp;
+      } catch (fallbackErr) {
+        console.error('[apiAuth] Supabase fallback failed', fallbackErr);
+        const combined = new Error(
+          `Refresh failed via backend: ${(primaryErr as Error).message}. Fallback to Supabase failed: ${(fallbackErr as Error).message}`
+        );
+        throw combined;
+      }
     }
+    throw primaryErr;
   }
 }
 
@@ -430,7 +452,7 @@ const resolveBaseUrl = () => {
     return effective;
   }
 
-  const effective = envBackend || 'https://agrolinkbackend.onrender.com';
+  const effective = envBackend || 'http://localhost:8080';
   console.info('[apiAuth] ENV DEV. VITE_BACKEND_URL =', envBackend, 'BASE_URL =', effective);
   return effective;
 };

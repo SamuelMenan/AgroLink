@@ -17,21 +17,11 @@ function CaptchaContent({ onChange, onToken, action = 'login' }: CaptchaGateProp
   }, [token, onChange, onToken])
 
   if (!siteKey) {
-    // Fallback simple cuando no hay sitekey configurado
-    return (
-      <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
-        <input 
-          type="checkbox" 
-          checked={!!token} 
-          onChange={(e) => { 
-            setToken(e.target.checked ? 'fallback-token' : null)
-            onToken?.(e.target.checked ? 'fallback-token' : null)
-          }} 
-          className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-600" 
-        />
-        <span>No soy un robot</span>
-      </label>
-    )
+    useEffect(() => {
+      onChange?.(true)
+      onToken?.(null)
+    }, [onChange, onToken])
+    return null
   }
 
   return (
@@ -46,8 +36,9 @@ function CaptchaContent({ onChange, onToken, action = 'login' }: CaptchaGateProp
 
 export default function CaptchaGate({ onChange, onToken, action = 'login' }: CaptchaGateProps) {
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
+  const forceDisable = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_RECAPTCHA_FORCE_DISABLE === 'true'
 
-  if (!siteKey) {
+  if (!siteKey || forceDisable) {
     return <CaptchaContent onChange={onChange} onToken={onToken} action={action} />
   }
 

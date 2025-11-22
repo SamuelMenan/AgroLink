@@ -192,31 +192,16 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
 
   const createNewConversation = async () => {
     if (!user || !productData) return
-    
     try {
       setIsLoading(true)
-      // This would typically call createConversation API
-      // For now, we'll simulate a new conversation
-      const newConversation: Conversation = {
-        id: `conv-${Date.now()}`,
-        buyer_id: user.id,
-        buyer_name: user.full_name || 'Comprador',
-        seller_id: productData.seller_id,
-        seller_name: productData.seller_name,
-        product_id: productData.id,
-        product_name: productData.name,
-        product_image: productData.image_url,
-        status: 'pending',
-        unread_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-      
-      setSelectedConversation(newConversation)
-      setConversations(prev => [newConversation, ...prev])
-      
-      // Send initial message
-      await sendInitialMessage(newConversation.id)
+      const conv = await (await import('../services/messagingService')).createConversation({
+        participantId: productData.seller_id,
+        productId: productData.id,
+        initialMessage: `Hola, estoy interesado en ${productData.name}.`
+      })
+      setSelectedConversation(conv)
+      setConversations(prev => [conv, ...prev])
+      await sendInitialMessage(conv.id)
     } catch (error) {
       console.error('Error creating conversation:', error)
     } finally {
