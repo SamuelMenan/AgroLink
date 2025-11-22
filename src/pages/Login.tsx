@@ -15,6 +15,9 @@ export default function Login() {
   const [facebookLoading, setFacebookLoading] = useState(false)
   const [remember, setRemember] = useState(true)
   const [showPwd, setShowPwd] = useState(false)
+  const [idError, setIdError] = useState<string | null>(null)
+  const [pwdReq, setPwdReq] = useState({ len:false, upper:false, num:false, special:false })
+  const [pwdStrength, setPwdStrength] = useState(0)
 
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/simple'
@@ -26,6 +29,20 @@ export default function Login() {
   const onIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value.replace(/^\s+/, '')
     setIdentifier(v)
+    const t = v.trim()
+    if (!t) { setIdError('Ingresa tu correo o teléfono'); return }
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)
+    const digits = t.replace(/\D/g,'')
+    const isPhone = digits.length === 10
+    setIdError(!isEmail && !isPhone ? 'Correo inválido o teléfono de 10 dígitos' : null)
+  }
+  const onPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    setPassword(v)
+    const req = { len: v.length>=8, upper: /[A-Z]/.test(v), num: /[0-9]/.test(v), special: /[^A-Za-z0-9]/.test(v) }
+    setPwdReq(req)
+    const score = [req.len, req.upper, req.num, req.special].reduce((a,b)=>a+(b?1:0),0)
+    setPwdStrength(score)
   }
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -35,6 +52,7 @@ export default function Login() {
       setFormError('Ingresa tu correo/teléfono y contraseña.')
       return
     }
+    if (idError) { setFormError(idError); return }
     setSubmitting(true)
     try {
       const { error } = await signInWithCredentials({ identifier: identifier.trim(), password })
@@ -91,7 +109,7 @@ export default function Login() {
             <div className="relative">
               <input
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={onPasswordChange}
                 type={showPwd ? 'text' : 'password'}
                 className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 pr-10 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
               />
@@ -115,6 +133,17 @@ export default function Login() {
                 )}
               </button>
             </div>
+            <div className="mt-2">
+              <div className="h-2 rounded bg-gray-200 overflow-hidden">
+                <div className={`h-2 transition-all duration-300 ease-in-out ${pwdStrength<=1?'bg-red-500':pwdStrength===2?'bg-yellow-500':pwdStrength===3?'bg-green-500':'bg-emerald-600'}`} style={{ width: `${(pwdStrength/4)*100}%` }}></div>
+              </div>
+              <ul className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                <li className={`flex items-center gap-1 ${pwdReq.len?'text-green-700':'text-gray-600'}`}><span className="material-icons-outlined text-base">{pwdReq.len?'check_circle':'radio_button_unchecked'}</span><span>8+ caracteres</span></li>
+                <li className={`flex items-center gap-1 ${pwdReq.upper?'text-green-700':'text-gray-600'}`}><span className="material-icons-outlined text-base">{pwdReq.upper?'check_circle':'radio_button_unchecked'}</span><span>1 mayúscula</span></li>
+                <li className={`flex items-center gap-1 ${pwdReq.num?'text-green-700':'text-gray-600'}`}><span className="material-icons-outlined text-base">{pwdReq.num?'check_circle':'radio_button_unchecked'}</span><span>1 número</span></li>
+                <li className={`flex items-center gap-1 ${pwdReq.special?'text-green-700':'text-gray-600'}`}><span className="material-icons-outlined text-base">{pwdReq.special?'check_circle':'radio_button_unchecked'}</span><span>1 especial</span></li>
+              </ul>
+            </div>
             
           </div>
           <div className="flex items-center justify-between">
@@ -134,7 +163,8 @@ export default function Login() {
               ¿Olvidaste tu contraseña?
             </a>
           </div>
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
+          {idError && <p className="text-sm text-red-600 transition-opacity duration-300 ease-in-out">{idError}</p>}
+          {formError && <p className="text-sm text-red-600 transition-opacity duration-300 ease-in-out">{formError}</p>}
           <button
             disabled={submitting}
             type="submit"
@@ -159,7 +189,7 @@ export default function Login() {
               onClick={async () => {
                 setGoogleLoading(true)
                 try {
-                await signInWithGoogle('/')
+                await signInWithGoogle('/simple')
                 } finally {
                   setGoogleLoading(false)
                 }
