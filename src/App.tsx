@@ -8,7 +8,6 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'       
 import ResetPassword from './pages/ResetPassword'
-import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Cart from './pages/Cart'
 import NotFound from './pages/NotFound'
@@ -58,7 +57,6 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/simple" element={<SimpleHub />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/dashboard/products" element={<MyProducts />} />

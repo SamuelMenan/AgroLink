@@ -160,18 +160,19 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const directUrl = `${BASE_URL}${path}`
+  const normalizedPath = path.startsWith('/api/orders') ? path.replace('/api/orders', '/api/v1/orders') : path
+  const directUrl = `${BASE_URL}${normalizedPath}`
   const isProd = import.meta.env.PROD
-  const shouldProxy = isProd && (path.startsWith('/api/v1') || path.startsWith('/api/proxy'))
-  const proxiedPath = path.startsWith('/api/proxy')
+  const shouldProxy = isProd && (normalizedPath.startsWith('/api/v1') || normalizedPath.startsWith('/api/proxy'))
+  const proxiedPath = normalizedPath.startsWith('/api/proxy')
     ? path
     : (shouldProxy
-        ? (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`)
-        : path)
+        ? (normalizedPath.startsWith('/') ? `/api/proxy${normalizedPath}` : `/api/proxy/${normalizedPath}`)
+        : normalizedPath)
   const proxyUrl = proxiedPath
 
   // Enhanced logging for production debugging
-  const endpointPath = path.split('/').slice(0, 4).join('/')
+  const endpointPath = normalizedPath.split('/').slice(0, 4).join('/')
   console.log('[apiFetch] Starting request:', {
     path,
     baseUrl: BASE_URL,
@@ -199,7 +200,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       lastUrlTried = primary
       
       // Increase timeout for products to allow backend warmup
-      const isProductOp = path.includes('/api/v1/products')
+      const isProductOp = normalizedPath.includes('/api/v1/products')
       const timeout = isProductOp ? 15000 : 8000
       
       console.log(`[apiFetch] Attempt ${attempt + 1}/${maxRetries} via ${shouldProxy ? 'proxy' : 'same-origin'}:`, primary, `timeout: ${timeout}ms`)
@@ -207,7 +208,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       
       // If proxy fails with 405/502/503/504, immediately try direct fetch (if endpoint supports CORS)
       if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
-        const endpointPath = path.split('/').slice(0, 4).join('/')
+        const endpointPath = normalizedPath.split('/').slice(0, 4).join('/')
         
         if (isEndpointCorsCompatible(endpointPath)) {
           console.warn(`[apiFetch] Proxy failed with ${res.status}, attempting direct fetch`, {
@@ -220,7 +221,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
             timestamp: new Date().toISOString()
           })
           try {
-            const directRes = await directFetch(path, init, headers, fetchImpl)
+            const directRes = await directFetch(normalizedPath, init, headers, fetchImpl)
             // Record that this endpoint works with direct access
             recordCorsCompatibility(endpointPath, true)
             
@@ -257,7 +258,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       
       // Si falla (405/5xx), intentar directo al backend solo si es mismo origen
       if (!res.ok && [405, 502, 503, 504].includes(res.status)) {
-        const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
+      const sameOrigin = (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         if (sameOrigin) {
           try {
             lastUrlTried = directUrl
@@ -294,7 +295,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
       
       // On network error, try direct fetch immediately (if endpoint supports CORS)
       if (attempt === 0) {
-        const endpointPath = path.split('/').slice(0, 4).join('/')
+        const endpointPath = normalizedPath.split('/').slice(0, 4).join('/')
         
         if (isEndpointCorsCompatible(endpointPath)) {
           console.warn('[apiFetch] Network error on first attempt, trying direct fetch', {
@@ -305,7 +306,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
             timestamp: new Date().toISOString()
           })
           try {
-            const directRes = await directFetch(path, init, headers, fetchImpl)
+            const directRes = await directFetch(normalizedPath, init, headers, fetchImpl)
             // Record that this endpoint works with direct access
             recordCorsCompatibility(endpointPath, true)
             

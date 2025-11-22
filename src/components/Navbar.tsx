@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext'
 import appLogo from '../assets/logo.png'
 import { getCartCount, onCartChange } from '../services/cartService'
 import { useEffect, useState } from 'react'
-import SupportAssistant from './SupportAssistant'
 
 const navItemClass = ({ isActive }: { isActive: boolean }) =>
   `px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-green-600 text-white' : 'text-gray-700 hover:bg-green-50 hover:text-green-700'}`
@@ -41,9 +40,6 @@ export default function Navbar() {
               <NavLink to="/products" className={navItemClass}>
                 Productos
               </NavLink>
-              <NavLink to="/dashboard" className={navItemClass}>
-                Panel
-              </NavLink>
               <NavLink to="/cart" className={(args)=> navItemClass(args) + ' relative'}>
                 Carrito
                 {cartCount > 0 && (
@@ -62,8 +58,9 @@ export default function Navbar() {
                   </div>
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[180px] truncate">{user.full_name || user.email}</span>
                 </div>
-                <NavLink to="/dashboard/settings" className={navItemClass}>
-                  Configuración
+                <NavLink to="/dashboard/settings" className={(args)=> navItemClass(args) + ' flex items-center justify-center'} aria-label="Configuración">
+                  <span className="material-icons-outlined text-xl">settings</span>
+                  <span className="sr-only">Configuración</span>
                 </NavLink>
                 <button
                   onClick={async () => { await signOut() }}
@@ -77,8 +74,9 @@ export default function Navbar() {
                 <NavLink to="/login" className={navItemClass}>
                   Iniciar sesión
                 </NavLink>
-                <NavLink to="/dashboard/settings" className={navItemClass}>
-                  Configuración
+                <NavLink to="/dashboard/settings" className={(args)=> navItemClass(args) + ' flex items-center justify-center'} aria-label="Configuración">
+                  <span className="material-icons-outlined text-xl">settings</span>
+                  <span className="sr-only">Configuración</span>
                 </NavLink>
                 <NavLink to="/register" className={({ isActive }) =>
                   `px-3 py-2 rounded-md text-sm font-medium border ${isActive ? 'bg-green-700 text-white border-green-700' : 'border-green-600 text-green-700 hover:bg-green-600 hover:text-white'}`
@@ -90,7 +88,7 @@ export default function Navbar() {
           </div>
         </div>
       </div>
-      <SupportAssistant />
+      
     </header>
   )
 }

@@ -24,16 +24,19 @@ function write(items: CartItem[]) {
   window.dispatchEvent(new CustomEvent('cart:updated'))
 }
 
-export function listCart(): CartItem[] { return read() }
-export function getCartCount(): number { return read().reduce((acc, it) => acc + (it.quantity || 0), 0) }
+export function listCart(): CartItem[] {
+  const items = read()
+  return items.map(i => ({ ...i, quantity: 1 }))
+}
+export function getCartCount(): number { return read().length }
 
-export function addToCart(item: Omit<CartItem, 'quantity'>, qty = 1) {
+export function addToCart(item: Omit<CartItem, 'quantity'>, _qty = 1) {
   const items = read()
   const idx = items.findIndex((i) => i.id === item.id)
   if (idx >= 0) {
-    items[idx].quantity += qty
+    items[idx].quantity = 1
   } else {
-    items.push({ ...item, quantity: qty })
+    items.push({ ...item, quantity: 1 })
   }
   write(items)
 }
@@ -48,7 +51,7 @@ export function setItemQuantity(id: string, qty: number) {
   const idx = items.findIndex((i) => i.id === id)
   if (idx >= 0) {
     if (qty <= 0) items.splice(idx, 1)
-    else items[idx].quantity = qty
+    else items[idx].quantity = 1
     write(items)
   }
 }

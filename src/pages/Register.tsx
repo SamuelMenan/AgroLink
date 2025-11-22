@@ -9,12 +9,10 @@ export default function Register() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [phone, setPhone] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
-  const [phoneError, setPhoneError] = useState<string | null>(null)
   const [showPwd, setShowPwd] = useState(false)
   const [pwdReq, setPwdReq] = useState({ len:false, upper:false, num:false, special:false })
   const [pwdStrength, setPwdStrength] = useState(0)
@@ -24,18 +22,18 @@ export default function Register() {
     setFormError(null)
     const fn = firstName.trim()
     const ln = lastName.trim()
-    if (fn.length < 2 || ln.length < 2) { setNameError('Nombre y apellido deben tener al menos 2 caracteres'); return }
-    const em = email.trim()
+    // Validación nombres: solo letras (incluye tildes y ñ), sin espacios/guiones/apóstrofes, 1–100
+    const nameRegex = /^\p{L}{1,100}$/u
+    if (!nameRegex.test(fn) || !nameRegex.test(ln)) { setNameError('Usa solo letras, 1–100 caracteres (sin espacios, guiones o apóstrofes)'); return }
+    const em = email.trim().toLowerCase()
     const isEmailValid = !em || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)
     if (!isEmailValid) { setEmailError('Correo inválido, usa formato user@domain.com'); return }
-    const digits = phone.replace(/\D/g,'')
-    if (digits && digits.length !== 10) { setPhoneError('El teléfono debe tener exactamente 10 dígitos'); return }
-    if (!em && !digits) { setFormError('Ingresa correo o teléfono'); return }
+    if (!em) { setFormError('Ingresa tu correo electrónico'); return }
     if (!password) { setFormError('Ingresa una contraseña'); return }
     setSubmitting(true)
     try {
       const fullName = `${fn} ${ln}`
-      const { error } = await signUpWithEmail({ fullName, email: em, password, phone: digits || undefined })
+      const { error } = await signUpWithEmail({ fullName, email: em, password })
       if (error) {
         setFormError(error)
         return
@@ -67,14 +65,9 @@ export default function Register() {
           </div>
           {nameError && <p className="text-sm text-red-600 transition-opacity duration-300 ease-in-out">{nameError}</p>}
           <div>
-            <label className="block text-sm font-medium text-gray-700">Correo electrónico (opcional)</label>
+            <label className="block text-sm font-medium text-gray-700">Correo electrónico</label>
             <input value={email} onChange={(e) => { const v=e.target.value.replace(/^\s+/, ''); setEmail(v); setEmailError(v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Correo inválido, usa formato user@domain.com' : null) }} type="email" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
             {emailError && <p className="text-sm text-red-600 transition-opacity duration-300 ease-in-out">{emailError}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Teléfono (opcional)</label>
-            <input value={formatPhone(phone)} onChange={(e) => { const digits=e.target.value.replace(/\D/g,'').slice(0,10); setPhone(digits); setPhoneError(digits && digits.length!==10 ? 'El teléfono debe tener exactamente 10 dígitos' : null) }} inputMode="numeric" type="tel" className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" placeholder="(___) ___-____" />
-            {phoneError && <p className="text-sm text-red-600 transition-opacity duration-300 ease-in-out">{phoneError}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Contraseña</label>
@@ -128,15 +121,5 @@ export default function Register() {
       </div>
     </main>
   )
-}
-
-function formatPhone(d: string) {
-  const s = d.replace(/\D/g,'').slice(0,10)
-  const p1 = s.slice(0,3)
-  const p2 = s.slice(3,6)
-  const p3 = s.slice(6,10)
-  if (s.length <= 3) return `(${p1}`
-  if (s.length <= 6) return `(${p1}) ${p2}`
-  return `(${p1}) ${p2}-${p3}`
 }
 
