@@ -1,5 +1,4 @@
 import { Routes, Route, useNavigate } from 'react-router-dom'
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'  
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -24,8 +23,7 @@ import CatalogManagement from './pages/dashboard/CatalogManagement'
 import { Messages } from './pages/Messages'
 
 function App() {
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
-  const forceDisable = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_RECAPTCHA_FORCE_DISABLE === 'true'
+  
 
   // Handler global para casos donde Supabase redirige al origen con hash (#access_token=...) sin pasar por /oauth/callback
   function GlobalOAuthHandler() {
@@ -35,7 +33,7 @@ function App() {
       const h = window.location.hash || ''
       if (h.includes('access_token=')) {
         const search = window.location.search || ''
-        const nextParam = new URLSearchParams(search).get('next') || '/'
+        const nextParam = new URLSearchParams(search).get('next') || '/simple'
         const target = `/oauth/callback?next=${encodeURIComponent(nextParam)}${h}`
         try {
           window.location.replace(target)
@@ -79,13 +77,7 @@ function App() {
     </ErrorBoundary>
   )
 
-  if (siteKey && !forceDisable) {
-    return (
-      <GoogleReCaptchaProvider reCaptchaKey={siteKey} useRecaptchaNet scriptProps={{ async: true, defer: true }}>
-        {appContent}
-      </GoogleReCaptchaProvider>
-    )
-  }
+  
 
   return appContent
 }

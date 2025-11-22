@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import CaptchaGate from '../components/CaptchaGate'
+ 
  
 
 export default function Login() {
@@ -15,11 +14,7 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [facebookLoading, setFacebookLoading] = useState(false)
   const [remember, setRemember] = useState(true)
-  const [captchaOk, setCaptchaOk] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [showPwd, setShowPwd] = useState(false)
-  const { executeRecaptcha } = useGoogleReCaptcha()
-  const forceDisableCaptcha = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_RECAPTCHA_FORCE_DISABLE === 'true'
 
   const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const nextParam = params.get('next') || '/simple'
@@ -40,28 +35,9 @@ export default function Login() {
       setFormError('Ingresa tu correo/teléfono y contraseña.')
       return
     }
-    // si hay sitekey configurado, genera token fresco antes de enviar
-    try {
-      const siteKeySet = !!(import.meta.env.VITE_RECAPTCHA_SITE_KEY)
-      if (siteKeySet && !forceDisableCaptcha && executeRecaptcha) {
-        const freshToken = await executeRecaptcha('login')
-        if (freshToken) {
-          setCaptchaToken(freshToken)
-          setCaptchaOk(true)
-        } else {
-          setFormError('No se pudo validar reCAPTCHA. Intenta nuevamente.')
-          return
-        }
-      }
-    } catch {
-      if (!forceDisableCaptcha) {
-        setFormError('Error generando token de seguridad. Intenta nuevamente.')
-        return
-      }
-    }
     setSubmitting(true)
     try {
-      const { error } = await signInWithCredentials({ identifier: identifier.trim(), password, captchaToken: captchaToken || undefined })
+      const { error } = await signInWithCredentials({ identifier: identifier.trim(), password })
       if (error) {
         setFormError(error)
         return
@@ -139,7 +115,7 @@ export default function Login() {
                 )}
               </button>
             </div>
-            <CaptchaGate onChange={setCaptchaOk} onToken={setCaptchaToken} action="login" />
+            
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -160,7 +136,7 @@ export default function Login() {
           </div>
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <button
-            disabled={submitting || (((!!import.meta.env.VITE_HCAPTCHA_SITEKEY) || (!!import.meta.env.VITE_RECAPTCHA_SITE_KEY)) && !captchaOk)}
+            disabled={submitting}
             type="submit"
             className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
           >

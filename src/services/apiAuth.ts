@@ -313,12 +313,12 @@ export async function signUp(fullName: string, email: string, password: string, 
   const basePayload: Record<string, unknown> = { password, data: { full_name: fullName } };
   const hasEmail = !!(email && email.trim());
   const hasPhone = !!(phone && phone.trim());
-  const enableSignupCaptcha = !!import.meta.env.VITE_ENABLE_SIGNUP_CAPTCHA;
+  
 
   if (hasEmail) basePayload.email = email.trim();
   if (hasPhone) basePayload.phone = phone!.trim();
   // Bypass temporal: omitir token de CAPTCHA durante registro salvo que se habilite explícitamente
-  if (captchaToken && enableSignupCaptcha) basePayload[captchaFieldName()] = captchaToken;
+  void captchaToken;
 
   // Pre-warm proxy/backend (health) antes de intentar alta, mitigando 502 por cold start
   try { await warmupProxy(); } catch { /* ignore */ }
@@ -336,7 +336,7 @@ export async function signUp(fullName: string, email: string, password: string, 
         throw new Error('El registro por correo está deshabilitado. Regístrate con tu número de teléfono o usa Google/Facebook.');
       }
       const phoneOnly: Record<string, unknown> = { password, data: { full_name: fullName }, phone: phone!.trim() };
-      if (captchaToken && enableSignupCaptcha) phoneOnly[captchaFieldName()] = captchaToken;
+      void captchaToken;
       const resp = await post(`${AUTH_PREFIX}/sign-up`, phoneOnly);
       if (resp.access_token && resp.refresh_token) setTokens(resp);
       try { await warmupProxy(); } catch { /* ignore */ }
@@ -349,7 +349,7 @@ export async function signUp(fullName: string, email: string, password: string, 
 export async function signInEmail(email: string, password: string, captchaToken?: string) {
   try {
     const body: Record<string, unknown> = { email, password };
-    if (captchaToken) body[captchaFieldName()] = captchaToken;
+    void captchaToken;
     const resp = await post(`${AUTH_PREFIX}/sign-in`, body);
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     try { await warmupProxy(); } catch { /* ignore */ }
@@ -386,7 +386,7 @@ export async function signInEmail(email: string, password: string, captchaToken?
 export async function signInPhone(phone: string, password: string, captchaToken?: string) {
   try {
     const body: Record<string, unknown> = { phone, password };
-    if (captchaToken) body[captchaFieldName()] = captchaToken;
+    void captchaToken;
     const resp = await post(`${AUTH_PREFIX}/sign-in`, body);
     if (resp.access_token && resp.refresh_token) setTokens(resp);
     try { await warmupProxy(); } catch { /* ignore */ }
@@ -490,7 +490,4 @@ export const getOAuthStartUrl = (provider: string, next: string, redirectTo?: st
   return `/api/proxy/api/v1/auth/oauth/start?${query}`;
 };
 
-function captchaFieldName() {
-  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-  return env.VITE_RECAPTCHA_SITE_KEY ? 'recaptcha_token' : 'hcaptcha_token';
-}
+ 

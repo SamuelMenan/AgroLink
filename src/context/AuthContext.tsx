@@ -148,14 +148,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Iniciar flujo OAuth: redirige al endpoint authorize de Supabase.
   // Supabase devolverá tokens en el fragmento (#access_token=...). Callback se procesa en /oauth/callback.
   const signInWithGoogle = async (redirectTo?: string) => {
-    const next = redirectTo || '/'
+    const next = redirectTo || '/simple'
     const redirect_to = `${window.location.origin}/oauth/callback`
     const url = getOAuthStartUrl('google', next, redirect_to)
     window.location.href = url
   }
 
   const signInWithFacebook = async (redirectTo?: string) => {
-    const next = redirectTo || '/'
+    const next = redirectTo || '/simple'
     const redirect_to = `${window.location.origin}/oauth/callback`
     const url = getOAuthStartUrl('facebook', next, redirect_to)
     window.location.href = url
