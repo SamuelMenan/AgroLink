@@ -178,7 +178,32 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
     try {
       const data = await getMessages(conversationId)
       // Ensure data is always an array, even if API returns null/undefined
-      setMessages(Array.isArray(data) ? data : [])
+      const arr = Array.isArray(data) ? data : []
+      setMessages(arr)
+      if (user?.id) {
+        const other = arr.find(m => m.sender_id !== user.id && (m.sender_name || '').trim())
+        const name = other?.sender_name?.trim()
+        if (name) {
+          setConversations(prev => prev.map(c => {
+            if (c.id !== conversationId) return c
+            if (user.id === c.buyer_id) {
+              const current = (c.seller_name || '').trim()
+              return { ...c, seller_name: current || name }
+            }
+            const current = (c.buyer_name || '').trim()
+            return { ...c, buyer_name: current || name }
+          }))
+          setSelectedConversation(prev => {
+            if (!prev || prev.id !== conversationId) return prev
+            if (user.id === prev.buyer_id) {
+              const current = (prev.seller_name || '').trim()
+              return { ...prev, seller_name: current || name }
+            }
+            const current = (prev.buyer_name || '').trim()
+            return { ...prev, buyer_name: current || name }
+          })
+        }
+      }
     } catch (error) {
       console.error('Error loading messages:', error)
       // Set empty array on error to prevent .map() errors
@@ -466,7 +491,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
             <span className="text-xs text-gray-500 mr-2">
               {formatTime(message.created_at)}
             </span>
-            <span className="text-xs font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-800">
               {otherName}
             </span>
           </div>

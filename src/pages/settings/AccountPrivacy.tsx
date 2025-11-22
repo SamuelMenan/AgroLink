@@ -5,7 +5,6 @@ import { changeMyPassword, getMyProfile, saveMyProfile } from '../../services/pr
 import { DEPARTMENTS } from '../../services/locationService'
 import { ValidatedInput } from '../../hooks/useValidation'
 import { VALIDATION_RULES } from '../../utils/inputValidation'
-import { useTheme } from '../../hooks/useTheme'
 
 function useDebounced<T>(value: T, delay = 600): T {
   const [debounced, setDebounced] = useState(value)
@@ -18,7 +17,6 @@ function useDebounced<T>(value: T, delay = 600): T {
 
 export default function AccountPrivacy(){
   const { user } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -350,19 +348,7 @@ export default function AccountPrivacy(){
         </div>
         </section>
 
-        <section className="border-t border-gray-100 p-6 md:p-8 space-y-4">
-          <h2 className="text-lg font-semibold">Preferencias</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/80 px-4 py-3">
-              <span className="text-sm text-gray-700">Tema</span>
-              <button type="button" onClick={toggleTheme} className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200">{theme === 'dark' ? 'Oscuro' : 'Claro'}</button>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/80 px-4 py-3">
-              <span className="text-sm text-gray-700">Notificaciones</span>
-              <NotificationsToggle />
-            </div>
-          </div>
-        </section>
+        
       </div>
     </main>
   )
@@ -397,19 +383,4 @@ function PasswordStrength({ value }: { value: string }){
   return <p className={`mt-2 text-xs ${color}`}>Fortaleza: {label}</p>
 }
 
-function NotificationsToggle(){
-  const [enabled, setEnabled] = useState<boolean>(() => {
-    const v = localStorage.getItem('notifications')
-    return v ? v === '1' : true
-  })
-  const toggle = () => {
-    const next = !enabled
-    setEnabled(next)
-    localStorage.setItem('notifications', next ? '1' : '0')
-  }
-  return (
-    <button type="button" onClick={toggle} className={`rounded-md px-3 py-1.5 text-sm font-medium ${enabled ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'} hover:opacity-90`}>
-      {enabled ? 'Activadas' : 'Desactivadas'}
-    </button>
-  )
-}
+/**/ 
