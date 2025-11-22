@@ -358,7 +358,7 @@ export async function signInEmail(email: string, password: string, captchaToken?
     return resp;
   } catch (err) {
     const msg = (err instanceof Error) ? err.message : String(err);
-    const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|502|503|504/i.test(msg);
+    const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|Failed to fetch|502|503|504/i.test(msg);
     if (!isInfra) throw err;
     // Fallback directo a Supabase para completar login en caso de cold start/5xx
     if (hasSupabaseEnv()) {
@@ -395,7 +395,7 @@ export async function signInPhone(phone: string, password: string, captchaToken?
     return resp;
   } catch (err) {
     const msg = (err instanceof Error) ? err.message : String(err);
-    const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|502|503|504/i.test(msg);
+    const isInfra = /Server error 5\d\d|tardó demasiado tiempo|Error de red|CORS|Network|Failed to fetch|502|503|504/i.test(msg);
     if (!isInfra) throw err;
     if (hasSupabaseEnv()) {
       try {
