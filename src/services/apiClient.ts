@@ -160,7 +160,8 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const normalizedPath = path.startsWith('/api/orders') ? path.replace('/api/orders', '/api/v1/orders') : path
+  let normalizedPath = path.startsWith('/api/orders') ? path.replace('/api/orders', '/api/v1/orders') : path
+  if (normalizedPath.startsWith('/api/proxy/')) normalizedPath = normalizedPath.replace('/api/proxy', '')
   const directUrl = `${BASE_URL}${normalizedPath}`
   const isProd = import.meta.env.PROD
   const shouldProxy = isProd && (normalizedPath.startsWith('/api/v1') || normalizedPath.startsWith('/api/proxy'))
