@@ -31,6 +31,9 @@
     { "source": "/api/proxy/api/v1/products-delete", "destination": "/api/products" },
     { "source": "/api/proxy/api/v1/products-update", "destination": "/api/products" },
     { "source": "/api/proxy/api/v1/auth/refresh", "destination": "/api/refresh" },
+    { "source": "/api/proxy/api/v1/auth/sign-in", "destination": "https://agrolinkbackend.onrender.com/api/v1/auth/sign-in" },
+    { "source": "/api/proxy/api/v1/auth/sign-up", "destination": "https://agrolinkbackend.onrender.com/api/v1/auth/sign-up" },
+    { "source": "/api/proxy/api/v1/auth/oauth/(.*)", "destination": "https://agrolinkbackend.onrender.com/api/v1/auth/oauth/$1" },
     
     { "source": "/api/proxy/api/v1/utils/health", "destination": "/api/utils?action=health" },
     { "source": "/api/proxy/api/v1/utils/warm", "destination": "/api/utils?action=warm" },
