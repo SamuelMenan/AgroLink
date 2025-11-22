@@ -114,6 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn('[AuthContext] sign-in fallback tras 422 falló', dupErr)
         }
         msg = 'Este usuario ya está registrado. Inicia sesión o usa otro correo/teléfono.'
+      } else if (/phone_provider_disabled/i.test(msg)) {
+        // El proveedor de teléfono está deshabilitado en Supabase: guiar al usuario y forzar correo
+        msg = 'El inicio por teléfono está deshabilitado. Regístrate o inicia sesión con tu correo.'
       } else if (msg.includes('400')) {
         msg = 'Los datos del formulario no son válidos. Por favor, verifica tu información.'
       } else if (msg.includes('network') || msg.includes('Network')) {
@@ -143,6 +146,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return {}
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error inicio sesión'
+      if (/phone_provider_disabled/i.test(msg)) {
+        return { error: 'El inicio por teléfono está deshabilitado. Usa tu correo y contraseña.' }
+      }
+      if (/invalid_credentials/i.test(msg)) {
+        return { error: 'Credenciales inválidas. Verifica tu correo/teléfono y contraseña.' }
+      }
       return { error: msg }
     }
   }
