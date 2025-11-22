@@ -374,17 +374,27 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
   try {
     const base = await apiClient.get<Conversation[]>(`/api/conversations?user_id=${userId}`)
     const convs = Array.isArray(base) ? base : []
-    // Enriquecer nombres ausentes usando endpoint de info pública
     const needIds = new Set<string>()
     convs.forEach(c => {
       if (!c.seller_name && c.seller_id) needIds.add(c.seller_id)
       if (!c.buyer_name && c.buyer_id) needIds.add(c.buyer_id)
+      if ((!c.seller_id || !c.buyer_id) && Array.isArray((c as any).participant_ids)) {
+        ((c as any).participant_ids as string[]).forEach(pid => { if (pid !== userId) needIds.add(pid) })
+      }
     })
     if (needIds.size > 0) {
       const map = await fetchUsersInfo(Array.from(needIds))
       convs.forEach(c => {
         if (!c.seller_name && c.seller_id && map[c.seller_id]) c.seller_name = map[c.seller_id].full_name
         if (!c.buyer_name && c.buyer_id && map[c.buyer_id]) c.buyer_name = map[c.buyer_id].full_name
+        const participants: string[] | undefined = (c as any).participant_ids
+        if (participants && participants.length) {
+          const other = participants.find(pid => pid !== userId)
+          if (other && map[other]) {
+            if (userId === (c as any).buyer_id) c.seller_name = c.seller_name || map[other].full_name
+            else c.buyer_name = c.buyer_name || map[other].full_name
+          }
+        }
       })
     }
     return convs
@@ -434,12 +444,22 @@ export async function getConversations(userId: string): Promise<Conversation[]> 
   convs.forEach(c => {
     if (!c.seller_name && c.seller_id) needIds.add(c.seller_id)
     if (!c.buyer_name && c.buyer_id) needIds.add(c.buyer_id)
+    const participants: string[] | undefined = (c as any).participant_ids
+    if (participants && participants.length) participants.forEach(pid => { if (pid !== userId) needIds.add(pid) })
   })
   if (needIds.size > 0) {
     const map = await fetchUsersInfo(Array.from(needIds))
     convs.forEach(c => {
       if (!c.seller_name && c.seller_id && map[c.seller_id]) c.seller_name = map[c.seller_id].full_name
       if (!c.buyer_name && c.buyer_id && map[c.buyer_id]) c.buyer_name = map[c.buyer_id].full_name
+      const participants: string[] | undefined = (c as any).participant_ids
+      if (participants && participants.length) {
+        const other = participants.find(pid => pid !== userId)
+        if (other && map[other]) {
+          if (userId === (c as any).buyer_id) c.seller_name = c.seller_name || map[other].full_name
+          else c.buyer_name = c.buyer_name || map[other].full_name
+        }
+      }
     })
   }
   return convs

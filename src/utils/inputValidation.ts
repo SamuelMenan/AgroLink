@@ -43,8 +43,13 @@ export const VALIDATION_RULES = {
     pattern: /^[A-Za-zÁáÉéÍíÓóÚúÑñÜü0-9\s\-]+$/,
     message: 'Caracteres no permitidos en búsqueda',
     allowEmpty: true
+  },
+  userName: {
+    pattern: /^[A-Za-zÁáÉéÍíÓóÚúÑñÜü\s]+$/,
+    message: 'Solo letras y espacios (sin guiones ni números)'
   }
 } as const
+
 
 // Real-time validation function
 export function validateInput(value: string, rule: ValidationRule): ValidationResult {

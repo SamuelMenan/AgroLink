@@ -406,7 +406,7 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
       ? (message.sender_name
         || (message.sender_id === selectedConversation?.buyer_id ? selectedConversation?.buyer_name : selectedConversation?.seller_name)
         || 'Usuario')
-      : 'Tú'
+      : (user?.full_name || 'Tú')
 
     console.log('[MessageCenter] renderMessage', {
       messageId: message.id,
@@ -435,7 +435,12 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
 
     // Get avatar initials
     const getAvatarInitials = (name: string) => {
-      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+      const n = (name || '').trim()
+      if (!n) return '?'
+      if (n.includes('@')) return n[0].toUpperCase()
+      const parts = n.split(/\s+/).filter(Boolean)
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+      return (parts[0][0] + parts[1][0]).toUpperCase()
     }
 
     // Get avatar color based on sender
@@ -648,7 +653,9 @@ export function MessageCenter({ initialConversation, productData }: MessageCente
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <p className="font-medium text-gray-800">
-                      {user.id === conversation.buyer_id ? conversation.seller_name : conversation.buyer_name}
+                      {user.id === conversation.buyer_id 
+                        ? (conversation.seller_name && conversation.seller_name.trim() ? conversation.seller_name : 'Usuario')
+                        : (conversation.buyer_name && conversation.buyer_name.trim() ? conversation.buyer_name : 'Usuario')}
                     </p>
                     <p className="text-sm text-gray-600 truncate">{conversation.product_name}</p>
                     {conversation.last_message && (
