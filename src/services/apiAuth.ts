@@ -76,7 +76,8 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   const isProd = import.meta.env.PROD
   const proxiedPath = path.startsWith('/api/proxy') ? path : (isProd && !isServerless ? (path.startsWith('/') ? `/api/proxy${path}` : `/api/proxy/${path}`) : path)
   const proxyUrl = isServerless ? path : proxiedPath
-  const directUrl = /^https?:\/\//i.test(path) ? path : `${BASE_URL}${path}`;
+  const normalizedForDirect = path.startsWith('/api/proxy') ? path.replace('/api/proxy', '') : path
+  const directUrl = /^https?:\/\//i.test(normalizedForDirect) ? normalizedForDirect : `${BASE_URL}${normalizedForDirect}`;
 
   // In PROD and cross-origin, force proxy-only to avoid CORS/gateway errors
 
