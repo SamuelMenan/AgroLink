@@ -123,7 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (msg.includes('405')) {
         msg = 'Error temporal en el servidor. Por favor, intenta nuevamente.'
       } else if (msg.includes('502') || msg.includes('503') || msg.includes('504')) {
-        msg = 'Servidor en arranque o temporalmente no disponible (502/503/504). Reintenta en unos segundos.'
+        const m = msg.match(/ID de error:\s*([a-f0-9\-]{10,})/i)
+        const eid = m?.[1]
+        msg = eid
+          ? `Problema temporal del servidor. Vuelve a intentar. ID de error: ${eid}`
+          : 'Servidor en arranque o temporalmente no disponible (502/503/504). Reintenta en unos segundos.'
       }
       
       return { error: msg }
@@ -144,14 +148,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Iniciar flujo OAuth: redirige al endpoint authorize de Supabase.
   // Supabase devolverá tokens en el fragmento (#access_token=...). Callback se procesa en /oauth/callback.
   const signInWithGoogle = async (redirectTo?: string) => {
-    const next = redirectTo || '/simple'
+    const next = redirectTo || '/'
     const redirect_to = `${window.location.origin}/oauth/callback`
     const url = getOAuthStartUrl('google', next, redirect_to)
     window.location.href = url
   }
 
   const signInWithFacebook = async (redirectTo?: string) => {
-    const next = redirectTo || '/simple'
+    const next = redirectTo || '/'
     const redirect_to = `${window.location.origin}/oauth/callback`
     const url = getOAuthStartUrl('facebook', next, redirect_to)
     window.location.href = url

@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'  
@@ -27,9 +27,30 @@ function App() {
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
   const forceDisable = (import.meta as unknown as { env: Record<string, string | undefined> }).env.VITE_RECAPTCHA_FORCE_DISABLE === 'true'
 
+  // Handler global para casos donde Supabase redirige al origen con hash (#access_token=...) sin pasar por /oauth/callback
+  function GlobalOAuthHandler() {
+    const navigate = useNavigate()
+    // Ejecuta una sola vez al montar
+    if (typeof window !== 'undefined') {
+      const h = window.location.hash || ''
+      if (h.includes('access_token=')) {
+        const search = window.location.search || ''
+        const nextParam = new URLSearchParams(search).get('next') || '/'
+        const target = `/oauth/callback?next=${encodeURIComponent(nextParam)}${h}`
+        try {
+          window.location.replace(target)
+        } catch {
+          navigate(`/oauth/callback?next=${encodeURIComponent(nextParam)}`)
+        }
+      }
+    }
+    return null
+  }
+
   const appContent = (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+        <GlobalOAuthHandler />
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />

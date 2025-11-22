@@ -164,7 +164,9 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
             }
             
             const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
-            throw new Error(`Auth ${res.status}: ${detail}`);
+            const eid = (json.error_id as string | undefined);
+            const suffix = eid ? ` (ID de error: ${eid})` : '';
+            throw new Error(`Auth ${res.status}: ${detail}${suffix}`);
           } catch {
             // If JSON parsing fails, still provide meaningful error
             if (res.status === 422 && text.includes('user_already_exists')) {
@@ -181,7 +183,16 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
           throw new Error(`Server error ${res.status}: ${text}`);
         }
         
-        throw new Error(`Server error ${res.status}: ${text}`);
+        // Último intento o otros 5xx: intentar extraer error_id para diagnóstico
+        try {
+          const json = JSON.parse(text);
+          const detail = (json.error && (json.error.message || json.error.code)) || (json.message as string | undefined) || text;
+          const eid = (json.error_id as string | undefined);
+          const suffix = eid ? ` (ID de error: ${eid})` : '';
+          throw new Error(`Server error ${res.status}: ${detail}${suffix}`);
+        } catch {
+          throw new Error(`Server error ${res.status}: ${text}`);
+        }
       }
       
       return JSON.parse(text);
@@ -302,10 +313,12 @@ export async function signUp(fullName: string, email: string, password: string, 
   const basePayload: Record<string, unknown> = { password, data: { full_name: fullName } };
   const hasEmail = !!(email && email.trim());
   const hasPhone = !!(phone && phone.trim());
+  const enableSignupCaptcha = !!import.meta.env.VITE_ENABLE_SIGNUP_CAPTCHA;
 
   if (hasEmail) basePayload.email = email.trim();
   if (hasPhone) basePayload.phone = phone!.trim();
-  if (captchaToken) basePayload[captchaFieldName()] = captchaToken;
+  // Bypass temporal: omitir token de CAPTCHA durante registro salvo que se habilite explícitamente
+  if (captchaToken && enableSignupCaptcha) basePayload[captchaFieldName()] = captchaToken;
 
   // Pre-warm proxy/backend (health) antes de intentar alta, mitigando 502 por cold start
   try { await warmupProxy(); } catch { /* ignore */ }
@@ -323,7 +336,7 @@ export async function signUp(fullName: string, email: string, password: string, 
         throw new Error('El registro por correo está deshabilitado. Regístrate con tu número de teléfono o usa Google/Facebook.');
       }
       const phoneOnly: Record<string, unknown> = { password, data: { full_name: fullName }, phone: phone!.trim() };
-      if (captchaToken) phoneOnly[captchaFieldName()] = captchaToken;
+      if (captchaToken && enableSignupCaptcha) phoneOnly[captchaFieldName()] = captchaToken;
       const resp = await post(`${AUTH_PREFIX}/sign-up`, phoneOnly);
       if (resp.access_token && resp.refresh_token) setTokens(resp);
       try { await warmupProxy(); } catch { /* ignore */ }

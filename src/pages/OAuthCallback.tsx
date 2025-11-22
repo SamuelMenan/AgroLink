@@ -41,9 +41,9 @@ export default function OAuthCallback() {
 
     // Leer ?next=... de la query
     const searchParams = new URLSearchParams(window.location.search)
-    const rawNext = searchParams.get('next') || '/simple'
+    const rawNext = searchParams.get('next') || '/'
 
-    let nextPath = '/simple'
+    let nextPath = '/'
 
     try {
       // Permitir tanto rutas relativas como URLs absolutas de TU mismo origin
@@ -63,16 +63,16 @@ export default function OAuthCallback() {
           return
         }
         // Orígenes externos distintos a localhost: ignorar por seguridad
-        nextPath = '/simple'
+        nextPath = '/'
       } else if (url.pathname === '/oauth/callback') {
         // Evita bucles: nunca navegues de nuevo al callback
-        nextPath = '/simple'
+        nextPath = '/'
       } else {
         nextPath = url.pathname + url.search + url.hash
       }
     } catch {
       // Si rawNext no es una URL válida, permitir solo rutas absolutas internas
-      nextPath = rawNext.startsWith('/') ? rawNext : '/simple'
+      nextPath = rawNext.startsWith('/') ? rawNext : '/'
     }
 
     // Logs de depuración y limpieza de URL
@@ -98,17 +98,17 @@ export default function OAuthCallback() {
       console.warn('[OAuthCallback] location.replace falló, fallback navigate()', e)
     }
 
-    navigate(nextPath || '/simple', { replace: true })
+    navigate(nextPath || '/', { replace: true })
 
     // Fallback adicional por si nada anterior efectúa la navegación (errores silenciosos de runtime o carga tardía):
     setTimeout(() => {
       if (window.location.pathname === '/oauth/callback') {
         console.warn('[OAuthCallback] Fallback timeout firing, aún en /oauth/callback -> forzando redirect a', nextPath)
         try {
-          window.location.replace(nextPath || '/simple')
+          window.location.replace(nextPath || '/')
         } catch (err) {
           console.error('[OAuthCallback] Fallback replace también falló, intentando assign', err)
-          try { window.location.assign(nextPath || '/simple') } catch { /* ignore */ }
+          try { window.location.assign(nextPath || '/') } catch { /* ignore */ }
         }
       }
     }, 800)

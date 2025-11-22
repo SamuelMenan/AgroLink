@@ -183,7 +183,7 @@ export default function Login() {
               onClick={async () => {
                 setGoogleLoading(true)
                 try {
-                  await signInWithGoogle('/simple')
+                await signInWithGoogle('/')
                 } finally {
                   setGoogleLoading(false)
                 }
