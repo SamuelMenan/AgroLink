@@ -87,7 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Supabase no devolvió tokens (probable confirmación activada o respuesta parcial)
         console.warn('[AuthContext] Supabase no devolvió tokens en sign-up. Intentando sign-in inmediato.')
         try {
-          const signinResp = await signInEmail(email, password, captchaToken)
+          const isPhone = !!(phone && phone.trim())
+          const signinResp = isPhone ? await signInPhone(phone!.trim(), password, captchaToken) : await signInEmail(email, password, captchaToken)
           const u2 = deriveUserFromTokens(signinResp)
           if (u2) setUser(u2)
         } catch (signinErr) {
@@ -102,7 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (/(422|user_already_exists|already registered|ya está registrado)/i.test(msg)) {
         // Intentar sign-in automático al detectar duplicado (posible segundo POST)
         try {
-          const signinResp = await signInEmail(email, password)
+          const isPhone = !!(phone && phone.trim())
+          const signinResp = isPhone ? await signInPhone(phone!.trim(), password) : await signInEmail(email, password)
           const uDup = deriveUserFromTokens(signinResp)
           if (uDup) {
             setUser(uDup)
