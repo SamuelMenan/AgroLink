@@ -156,7 +156,7 @@ export default function AccountPrivacy(){
       return
     }
     try {
-      await changeMyPassword(pwdNew)
+      await changeMyPassword(pwdNew, pwdCurrent)
       setPwdStatus('Contraseña actualizada. Si la sesión expira, vuelve a iniciar sesión.')
       setPwdCurrent(''); setPwdNew(''); setPwdConfirm('')
     } catch (e: unknown) {

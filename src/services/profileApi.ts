@@ -50,10 +50,10 @@ export async function saveMyProfile(userId: string, patch: ProfilePatch): Promis
   }
 }
 
-export async function changeMyPassword(newPassword: string): Promise<void> {
+export async function changeMyPassword(newPassword: string, currentPassword?: string): Promise<void> {
   try {
     const resp = await apiFetch('/api/profile/password', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newPassword, currentPassword }),
     })
     if (!resp.ok) throw new Error('No se pudo cambiar contraseña')
   } catch {
