@@ -21,6 +21,8 @@
     }
   },
   "rewrites": [
+    { "source": "/oauth/callback", "destination": "/index.html" },
+    { "source": "/oauth/callback(.*)", "destination": "/index.html" },
     { "source": "/api/proxy/api/v1/notifications/by-user/(.*)", "destination": "/api/notifications?user_id=$1" },
     { "source": "/api/proxy/api/v1/notifications/read-all/(.*)", "destination": "/api/notifications?user_id=$1" },
     
