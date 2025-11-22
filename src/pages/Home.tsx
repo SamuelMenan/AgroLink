@@ -1,5 +1,7 @@
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { AIChat } from '../components/AIChat'
+import { aiService } from '../services/aiService'
 
 export default function Home() {
   const { user } = useAuth()
@@ -44,6 +46,28 @@ export default function Home() {
 
       {/* Panel del usuario autenticado */}
       
+      {/* Asistente de IA */}
+      <section className="bg-gradient-to-b from-gray-50 to-transparent">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Asistente Agrícola Inteligente
+            </h2>
+            <p className="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+              Obtén consejos expertos sobre agricultura, cultivos y técnicas agrícolas con nuestro asistente de IA especializado.
+            </p>
+          </div>
+          
+          <div className="max-w-4xl mx-auto">
+            <AIChat 
+              suggestedQuestions={aiService.getSuggestedQuestions()}
+              maxHeight="500px"
+              title="Asistente AgroLink"
+              placeholder="Pregúntame sobre agricultura, cultivos, técnicas de siembra, manejo de plagas..."
+            />
+          </div>
+        </div>
+      </section>
     </main>
   )
 }

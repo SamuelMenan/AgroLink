@@ -41,6 +41,8 @@
     { "source": "/api/proxy/api/v1/utils/warm", "destination": "/api/utils?action=warm" },
     { "source": "/api/proxy/api/v1/utils/status", "destination": "/api/utils?action=status" },
     
+    { "source": "/api/proxy/api/v1/ai/deepseek/chat", "destination": "https://agrolinkbackend.onrender.com/api/v1/ai/deepseek/chat" },
+    
     { "source": "/api/proxy/api/v1/rpc", "destination": "/api/rpc" },
     { "source": "/api/proxy/api/v1/conversations", "destination": "/api/conversations" },
     { "source": "/api/proxy/api/v1/conversations/(.*)", "destination": "/api/conversations/$1" },

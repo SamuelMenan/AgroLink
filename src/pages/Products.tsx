@@ -7,6 +7,8 @@ import { listPublicProducts, type SearchFilters, deleteProduct as deleteLocalPro
 import { createConversation } from '../services/messagingService'
 
 import { EnhancedSearch, type EnhancedSearchFilters } from '../components/EnhancedSearch'
+import { ProductAIRecommendations } from '../components/ProductAIRecommendations'
+import { AIChat } from '../components/AIChat'
 
 export default function Products() {
   const [enhancedFilters, setEnhancedFilters] = useState<EnhancedSearchFilters>({
@@ -93,6 +95,18 @@ export default function Products() {
         />
       </section>
 
+      {/* AI Recommendations Section */}
+      {enhancedFilters.q && (
+        <section className="mt-8">
+          <ProductAIRecommendations 
+            productName={enhancedFilters.q}
+            category={enhancedFilters.category || 'productos agrícolas'}
+            description={`Búsqueda de productos con término: "${enhancedFilters.q}"${enhancedFilters.category ? ` en categoría ${enhancedFilters.category}` : ''}`}
+            className="mb-6"
+          />
+        </section>
+      )}
+
       {/* Resultados */}
       <section className="mt-6">
         {offlineStatus.isOffline && (
@@ -127,6 +141,37 @@ export default function Products() {
             {items.map(p => <ProductCard key={p.id} p={p} userLat={coords?.lat} userLng={coords?.lng} />)}
           </div>
         )}
+      </section>
+
+      {/* AI Assistant for Product Questions */}
+      <section className="mt-12">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">¿Tienes preguntas sobre productos?</h2>
+            <p className="text-gray-600">
+              Nuestro asistente de IA puede ayudarte con recomendaciones sobre productos agrícolas, 
+              consejos de almacenamiento, técnicas de cultivo y más.
+            </p>
+          </div>
+          
+          <div className="max-w-3xl mx-auto">
+            <AIChat 
+              title="Asistente de Productos"
+              placeholder="Pregunta sobre productos agrícolas, técnicas de cultivo, almacenamiento..."
+              maxHeight="400px"
+              suggestedQuestions={[
+                "¿Qué productos son mejores para cultivar en esta temporada?",
+                "¿Cómo puedo almacenar frutas y verduras frescas por más tiempo?",
+                "¿Qué productos agrícolas son más rentables?",
+                "¿Cómo sé si un producto es de buena calidad?",
+                "¿Qué técnicas de cultivo recomiendas para principiantes?",
+                "¿Cómo puedo prevenir plagas en mis cultivos?",
+                "¿Qué productos necesito para empezar un huerto casero?",
+                "¿Cómo puedo obtener mejores precios para mis productos?"
+              ]}
+            />
+          </div>
+        </div>
       </section>
     </main>
   )
