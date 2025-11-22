@@ -106,7 +106,7 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id' | 'user_id' | 'created_at'>>): Promise<Product> {
-  const res = await apiFetch(`/api/v1/products-update/${encodeURIComponent(id)}`, {
+  const res = await apiFetch(`/api/v1/products?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch)
@@ -117,7 +117,7 @@ export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const res = await apiFetch(`/api/v1/products-delete/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const res = await apiFetch(`/api/v1/products?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Error eliminando producto')
 }
 

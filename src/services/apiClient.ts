@@ -160,7 +160,18 @@ export async function apiFetch(path: string, init: RequestInit = {}, fetchImpl: 
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  let normalizedPath = path.startsWith('/api/orders') ? path.replace('/api/orders', '/api/v1/orders') : path
+  let normalizedPath = path
+  // Normalize legacy product endpoints to the generic products route
+  if (normalizedPath.startsWith('/api/v1/products-update')) {
+    normalizedPath = normalizedPath.replace('/api/v1/products-update', '/api/v1/products')
+  } else if (normalizedPath.startsWith('/api/v1/products-delete')) {
+    normalizedPath = normalizedPath.replace('/api/v1/products-delete', '/api/v1/products')
+  } else if (normalizedPath.startsWith('/api/proxy/api/v1/products-update')) {
+    normalizedPath = normalizedPath.replace('/api/proxy/api/v1/products-update', '/api/v1/products')
+  } else if (normalizedPath.startsWith('/api/proxy/api/v1/products-delete')) {
+    normalizedPath = normalizedPath.replace('/api/proxy/api/v1/products-delete', '/api/v1/products')
+  }
+  if (normalizedPath.startsWith('/api/orders')) normalizedPath = normalizedPath.replace('/api/orders', '/api/v1/orders')
   if (normalizedPath.startsWith('/api/proxy/')) normalizedPath = normalizedPath.replace('/api/proxy', '')
   const directUrl = `${BASE_URL}${normalizedPath}`
   const isProd = import.meta.env.PROD
