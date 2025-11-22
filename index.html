@@ -10,56 +10,9 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Bridge de autenticación Supabase (robusto)
-      (function bridge() {
-        try {
-          const hash = window.location.hash;
-          const isCallbackPath = window.location.pathname === '/oauth/callback';
-          const urlParams = new URLSearchParams(window.location.search);
-          const requestedNext = urlParams.get('next') || '/simple';
-          const resolvedNext = (requestedNext && requestedNext.startsWith('/') ? requestedNext : '/simple');
-          const finalNext = resolvedNext.startsWith('/oauth/callback') ? '/simple' : resolvedNext;
-
-          if (hash && hash.includes('access_token=')) {
-            const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
-            const access = params.get('access_token');
-            const refresh = params.get('refresh_token');
-            if (access) localStorage.setItem('agrolink_access_token', access);
-            if (refresh) localStorage.setItem('agrolink_refresh_token', refresh);
-            // Limpia hash para evitar exponer tokens
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-            if (finalNext !== window.location.pathname) {
-              window.location.replace(finalNext);
-              return;
-            }
-          } else if (isCallbackPath) {
-            // Caso: callback sin hash (ya limpiado o error en proveedor) => redirigir a next seguro
-            if (finalNext !== window.location.pathname) {
-              window.location.replace(finalNext);
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('[oauth-bridge] error procesando callback', err);
-          // Fallback mínimo: si seguimos en /oauth/callback, redirigir a /simple
-          if (window.location.pathname === '/oauth/callback') {
-            window.location.replace('/simple');
-          }
-        }
-        // Safeguard adicional: si tras 1s seguimos en /oauth/callback con hash, forzar limpieza
-        setTimeout(function() {
-          if (window.location.pathname === '/oauth/callback') {
-            if (window.location.hash.includes('access_token=')) {
-              window.history.replaceState(null, '', '/simple');
-              window.location.replace('/simple');
-            } else {
-              window.location.replace('/simple');
-            }
-          }
-        }, 1000);
-      })();
-    </script>
+    <!-- OAuth bridge eliminado: la lógica de procesamiento y redirección
+         de tokens ahora reside exclusivamente en el componente React
+         `OAuthCallback.tsx` para evitar condiciones de carrera y doble manejo. -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

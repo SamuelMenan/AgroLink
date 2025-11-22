@@ -8,36 +8,35 @@ export default function OAuthCallback() {
   useEffect(() => {
     // URL ejemplo:
     // https://agro-link-jet.vercel.app/oauth/callback?next=https://agro-link-jet.vercel.app/simple#access_token=...&refresh_token=...
-    const rawHash = window.location.hash.startsWith('#')
-      ? window.location.hash.slice(1)
-      : window.location.hash
-
+    const rawHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
     const hashParams = new URLSearchParams(rawHash)
     const access_token = hashParams.get('access_token')
     const refresh_token = hashParams.get('refresh_token') || ''
     const token_type = hashParams.get('token_type') || undefined
-    const expires_in = hashParams.get('expires_in')
-      ? Number(hashParams.get('expires_in'))
-      : undefined
+    const expires_in = hashParams.get('expires_in') ? Number(hashParams.get('expires_in')) : undefined
 
-    if (!access_token) {
+    const storedAccess = localStorage.getItem('agrolink_access_token')
+    const hasIncomingTokens = !!access_token
+    const effectiveAccess = hasIncomingTokens ? access_token : storedAccess
+
+    if (!effectiveAccess) {
+      console.debug('[OAuthCallback] No tokens in hash or storage -> redirect login')
       navigate('/login', { replace: true })
       return
     }
 
-    const backendResp: BackendAuthResponse = {
-      access_token,
-      refresh_token,
-      token_type,
-      expires_in,
-      user: undefined,
-    }
-
-    try {
-      setTokens(backendResp)
-      console.info('[OAuthCallback] Tokens OAuth guardados correctamente')
-    } catch (e) {
-      console.error('[OAuthCallback] Error guardando tokens OAuth', e)
+    if (hasIncomingTokens) {
+      const backendResp: BackendAuthResponse = { access_token: effectiveAccess, refresh_token, token_type, expires_in, user: undefined }
+      try {
+        setTokens(backendResp)
+        console.info('[OAuthCallback] Tokens OAuth guardados correctamente (hash)')
+      } catch (e) {
+        console.error('[OAuthCallback] Error guardando tokens OAuth', e)
+      }
+      // Limpiar hash para no dejar tokens en la barra
+      try { window.history.replaceState(null, '', window.location.pathname + window.location.search) } catch { /* ignore */ }
+    } else {
+      console.debug('[OAuthCallback] Usando tokens ya almacenados, hash vacío (idempotente)')
     }
 
     // Leer ?next=... de la query
@@ -79,6 +78,11 @@ export default function OAuthCallback() {
     // Logs de depuración y limpieza de URL
     console.debug('[OAuthCallback] rawNext =', rawNext)
     console.debug('[OAuthCallback] nextPath =', nextPath)
+    console.debug('[OAuthCallback] final redirect decision', {
+      hasIncomingTokens,
+      storedAccessPresent: !!storedAccess,
+      pathname: window.location.pathname
+    })
     try {
       window.history.replaceState(null, '', window.location.pathname)
     } catch { /* ignore */ }
