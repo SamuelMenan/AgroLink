@@ -8,10 +8,11 @@ export default async function handler(req, res) {
   const userId = decodeURIComponent(pathParts[pathParts.length - 1] || '')
 
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET,PATCH,OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PATCH,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
 
   if (method === 'OPTIONS') { res.status(204).end(); return }
+  if (method === 'HEAD') { res.status(200).end(); return }
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     res.status(503).json({ error: 'Supabase no configurado' }); return
