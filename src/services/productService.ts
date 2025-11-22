@@ -1,6 +1,7 @@
 import type { Product } from '../types/product'
 import { v4 as uuidv4 } from './uuid'
 import { apiFetch } from './apiClient'
+import { getAccessToken } from './apiAuth'
 import { DEPARTMENTS, MUNICIPALITIES } from './locationService'
 
 // Backend-only implementation: all persistence via REST to /api/* controllers.
@@ -106,19 +107,109 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function updateProduct(id: string, patch: Partial<Omit<Product, 'id' | 'user_id' | 'created_at'>>): Promise<Product> {
+  const safe = sanitizePatch(patch)
   const res = await apiFetch(`/api/v1/products?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch)
+    body: JSON.stringify(safe)
   })
-  if (!res.ok) throw new Error('Error actualizando producto')
+  if (!res.ok) {
+    const fb = await supabaseUpdateProduct(id, safe)
+    return fb
+  }
   const data = await res.json()
   return Array.isArray(data) ? (data[0] as Product) : (data as Product)
 }
 
 export async function deleteProduct(id: string): Promise<void> {
   const res = await apiFetch(`/api/v1/products?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error('Error eliminando producto')
+  if (!res.ok) {
+    await supabaseDeleteProduct(id)
+    return
+  }
+}
+
+async function supabaseDeleteProduct(id: string): Promise<void> {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env
+  const SUPABASE_URL = env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase no configurado')
+  const endpoint = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/products?id=eq.${encodeURIComponent(id)}`
+  const token = getAccessToken()
+  const res = await fetch(endpoint, {
+    method: 'DELETE',
+    headers: {
+      'accept': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': token ? `Bearer ${token}` : `Bearer ${SUPABASE_ANON_KEY}`,
+      'Prefer': 'return=minimal'
+    }
+  })
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text()
+    throw new Error(text || 'Error eliminando producto')
+  }
+}
+
+async function supabaseUpdateProduct(id: string, patch: Partial<Omit<Product, 'id' | 'user_id' | 'created_at'>>): Promise<Product> {
+  const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env
+  const SUPABASE_URL = env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error('Supabase no configurado')
+  const endpoint = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/products?id=eq.${encodeURIComponent(id)}`
+  const token = getAccessToken()
+  const res = await fetch(endpoint, {
+    method: 'PATCH',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': token ? `Bearer ${token}` : `Bearer ${SUPABASE_ANON_KEY}`,
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(sanitizePatch(patch))
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    try {
+      const json = JSON.parse(text)
+      const detail = (json.error && (json.error.message || json.error.code)) || json.message || text
+      throw new Error(detail)
+    } catch {
+      throw new Error(text || 'Error actualizando producto')
+    }
+  }
+  const data = JSON.parse(text)
+  return Array.isArray(data) ? (data[0] as Product) : (data as Product)
+}
+
+function sanitizePatch(patch: Partial<Record<string, unknown>>): Record<string, unknown> {
+  const banned = new Set(['id','user_id','created_at','updated_at','owner_id'])
+  const out: Record<string, unknown> = {}
+  Object.entries(patch).forEach(([k,v]) => {
+    if (banned.has(k)) return
+    if (v === undefined) return
+    if (k === 'price' || k === 'price_per_unit' || k === 'price_per_kilo') {
+      const num = typeof v === 'string' ? Number((v as string).replace(/[,]/g,'')) : v
+      if (typeof num === 'number' && !Number.isNaN(num)) out[k] = num
+      return
+    }
+    if (k === 'quantity') {
+      out[k] = typeof v === 'number' ? String(v) : String(v)
+      return
+    }
+    if (k === 'stock_available') {
+      out[k] = typeof v === 'string' ? /^(true|1|yes)$/i.test(v as string) : !!v
+      return
+    }
+    if (k === 'description') {
+      const s = String(v).trim()
+      out[k] = s.length > 200 ? s.slice(0,200) : s
+      return
+    }
+    out[k] = v
+  })
+  return out
 }
 
 // ---------- Búsqueda pública (HU04) ----------
