@@ -1,20 +1,21 @@
 import { Routes, Route } from 'react-router-dom'
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3'
 import Navbar from './components/Navbar'
-import ProtectedRoute from './components/ProtectedRoute'
+import ProtectedRoute from './components/ProtectedRoute'  
 import { ErrorBoundary } from './components/ErrorBoundary'
-import SystemMonitor from './components/SystemMonitor'
+import SystemMonitor from './components/SystemMonitor'    
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import ForgotPassword from './pages/ForgotPassword'
+import ForgotPassword from './pages/ForgotPassword'       
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Cart from './pages/Cart'
 import NotFound from './pages/NotFound'
 import PublishProduct from './pages/products/PublishProduct'
-import MyProducts from './pages/products/MyProducts'
-import EditProduct from './pages/products/EditProduct'
+import MyProducts from './pages/products/MyProducts'      
+import EditProduct from './pages/products/EditProduct'    
 import SimpleHub from './pages/SimpleHub'
 import OrdersDashboard from './pages/orders/OrdersDashboard'
 import AccountPrivacy from './pages/settings/AccountPrivacy'
@@ -23,7 +24,9 @@ import CatalogManagement from './pages/dashboard/CatalogManagement'
 import { Messages } from './pages/Messages'
 
 function App() {
-  return (
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined
+
+  const appContent = (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
         <Navbar />
@@ -53,6 +56,16 @@ function App() {
       </div>
     </ErrorBoundary>
   )
+
+  if (siteKey) {
+    return (
+      <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
+        {appContent}
+      </GoogleReCaptchaProvider>
+    )
+  }
+
+  return appContent
 }
 
 export default App

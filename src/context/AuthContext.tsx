@@ -146,16 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async (redirectTo?: string) => {
     const next = redirectTo || '/simple'
     const redirect_to = `${window.location.origin}/oauth/callback`
-    const baseUrl = getOAuthStartUrl('google', next)
-    const url = `${baseUrl}&redirect_to=${encodeURIComponent(redirect_to)}`
+    const url = getOAuthStartUrl('google', next, redirect_to)
     window.location.href = url
   }
 
   const signInWithFacebook = async (redirectTo?: string) => {
     const next = redirectTo || '/simple'
     const redirect_to = `${window.location.origin}/oauth/callback`
-    const baseUrl = getOAuthStartUrl('facebook', next)
-    const url = `${baseUrl}&redirect_to=${encodeURIComponent(redirect_to)}`
+    const url = getOAuthStartUrl('facebook', next, redirect_to)
     window.location.href = url
   }
 

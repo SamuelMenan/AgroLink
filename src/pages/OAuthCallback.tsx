@@ -99,6 +99,19 @@ export default function OAuthCallback() {
     }
 
     navigate(nextPath || '/simple', { replace: true })
+
+    // Fallback adicional por si nada anterior efectúa la navegación (errores silenciosos de runtime o carga tardía):
+    setTimeout(() => {
+      if (window.location.pathname === '/oauth/callback') {
+        console.warn('[OAuthCallback] Fallback timeout firing, aún en /oauth/callback -> forzando redirect a', nextPath)
+        try {
+          window.location.replace(nextPath || '/simple')
+        } catch (err) {
+          console.error('[OAuthCallback] Fallback replace también falló, intentando assign', err)
+          try { window.location.assign(nextPath || '/simple') } catch { /* ignore */ }
+        }
+      }
+    }, 800)
   }, [navigate])
 
   return (

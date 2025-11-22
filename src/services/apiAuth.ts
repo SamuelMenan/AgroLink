@@ -438,8 +438,22 @@ const resolveBaseUrl = () => {
 const BASE_URL = resolveBaseUrl();
 
 // Usar siempre ruta proxied para evitar fallos de CORS/502 en redirecciones OAuth.
-export const getOAuthStartUrl = (provider: string, next: string) =>
-  `${import.meta.env.DEV ? '/api/v1/auth' : '/api/proxy/api/v1/auth'}/oauth/start?provider=${encodeURIComponent(provider)}&next=${encodeURIComponent(next)}`;
+export const getOAuthStartUrl = (provider: string, next: string, redirectTo?: string) => {
+  const params = new URLSearchParams();
+  params.set('provider', provider);
+  params.set('next', next);
+  if (redirectTo) params.set('redirect_to', redirectTo);
+  const query = params.toString();
+  if (import.meta.env.DEV) {
+    const envBackend = import.meta.env.VITE_BACKEND_URL;
+    if (envBackend && envBackend.trim()) {
+      const base = envBackend.replace(/\/+$/, '');
+      return `${base}/api/v1/auth/oauth/start?${query}`;
+    }
+    return `/api/v1/auth/oauth/start?${query}`;
+  }
+  return `/api/proxy/api/v1/auth/oauth/start?${query}`;
+};
 
 function captchaFieldName() {
   const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;

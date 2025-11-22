@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import CaptchaGate from '../components/CaptchaGate'
-import { getOAuthStartUrl } from '../services/apiAuth'
+ 
 
 export default function Login() {
-  const { signInWithCredentials /*, signInWithGoogle, signInWithFacebook */ } = useAuth()
+  const { signInWithCredentials, signInWithGoogle, signInWithFacebook } = useAuth()
   const navigate = useNavigate()
   const [identifier, setIdentifier] = useState('') // correo o teléfono
   const [password, setPassword] = useState('')
@@ -23,12 +23,7 @@ export default function Login() {
   const intent = params.get('intent')
   const messagingRedirect = intent === 'messaging'
 
-  // URL absoluta a donde queremos ir después de login
-  const redirectAbs = useMemo(() => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : ''
-    const path = nextParam.startsWith('/') ? nextParam : '/simple'
-    return `${origin}${path}`
-  }, [nextParam])
+  
 
   const onIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value.replace(/^\s+/, '')
@@ -42,8 +37,8 @@ export default function Login() {
       setFormError('Ingresa tu correo/teléfono y contraseña.')
       return
     }
-    // si hay sitekey configurado, requiere captcha
-    if (import.meta.env.VITE_HCAPTCHA_SITEKEY && !captchaOk) {
+    // si hay sitekey configurado (hCaptcha o reCAPTCHA), requiere captcha
+    if ((import.meta.env.VITE_HCAPTCHA_SITEKEY || import.meta.env.VITE_RECAPTCHA_SITE_KEY) && !captchaOk) {
       setFormError('Completa la verificación de seguridad.')
       return
     }
@@ -127,7 +122,7 @@ export default function Login() {
                 )}
               </button>
             </div>
-            <CaptchaGate onChange={setCaptchaOk} onToken={setCaptchaToken} />
+            <CaptchaGate onChange={setCaptchaOk} onToken={setCaptchaToken} action="login" />
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -148,7 +143,7 @@ export default function Login() {
           </div>
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <button
-            disabled={submitting || (!!import.meta.env.VITE_HCAPTCHA_SITEKEY && !captchaOk)}
+            disabled={submitting || (((!!import.meta.env.VITE_HCAPTCHA_SITEKEY) || (!!import.meta.env.VITE_RECAPTCHA_SITE_KEY)) && !captchaOk)}
             type="submit"
             className="w-full rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white shadow transition-all hover:-translate-y-0.5 hover:bg-green-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -171,9 +166,7 @@ export default function Login() {
               onClick={async () => {
                 setGoogleLoading(true)
                 try {
-                  // Redirigir directamente al backend OAuth start
-                  const url = getOAuthStartUrl('google', redirectAbs)
-                  window.location.href = url
+                  await signInWithGoogle('/simple')
                 } finally {
                   setGoogleLoading(false)
                 }
@@ -232,8 +225,7 @@ export default function Login() {
               onClick={async () => {
                 setFacebookLoading(true)
                 try {
-                  const url = getOAuthStartUrl('facebook', redirectAbs)
-                  window.location.href = url
+                  await signInWithFacebook('/simple')
                 } finally {
                   setFacebookLoading(false)
                 }
