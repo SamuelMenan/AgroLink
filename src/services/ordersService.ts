@@ -53,7 +53,10 @@ export async function listOrdersForSeller(sellerId: string, filters: OrderFilter
   if (filters.to) params.push(`created_at=lte.${filters.to}`)
   const q = params.join('&')
   const res = await apiFetch(`/api/orders?q=${encodeURIComponent(q)}`)
-  if (!res.ok) throw new Error('Error listando órdenes vendedor')
+  if (!res.ok) {
+    try { console.warn('Pedidos: respuesta no OK para vendedor', res.status) } catch {}
+    return []
+  }
   return await res.json() as Order[]
 }
 
@@ -70,7 +73,10 @@ export async function listOrdersForBuyer(buyerId: string, filters: OrderFilters 
   if (filters.to) params.push(`created_at=lte.${filters.to}`)
   const q = params.join('&')
   const res = await apiFetch(`/api/orders?q=${encodeURIComponent(q)}`)
-  if (!res.ok) throw new Error('Error listando órdenes comprador')
+  if (!res.ok) {
+    try { console.warn('Pedidos: respuesta no OK para comprador', res.status) } catch {}
+    return []
+  }
   return await res.json() as Order[]
 }
 

@@ -112,11 +112,28 @@ export default async function handler(req, res) {
         body = Buffer.concat(chunks)
       }
 
+      // Resolve product ID from pathSuffix or query string (supports id and q=id=eq.<id>)
+      let productId = null
+      if (pathSuffix) {
+        productId = pathSuffix
+      } else {
+        const idParam = urlObj.searchParams.get('id')
+        if (idParam) {
+          productId = idParam.startsWith('eq.') ? idParam.slice(3) : idParam
+        } else {
+          const qParam = urlObj.searchParams.get('q')
+          if (qParam) {
+            const m = qParam.match(/(?:^|&)id=eq\.([^&]+)/)
+            if (m && m[1]) productId = m[1]
+          }
+        }
+      }
+
       let supabaseEndpoint
       if (method === 'POST') {
         supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products`
-      } else if (pathSuffix) {
-        supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${pathSuffix}`
+      } else if (productId) {
+        supabaseEndpoint = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/products?id=eq.${productId}`
       } else {
         res.status(400).json({ ok: false, error: 'Missing product ID' })
         return

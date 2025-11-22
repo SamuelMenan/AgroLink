@@ -19,7 +19,7 @@ export default function OrdersDashboard(){
   const [filters, setFilters] = useState<OrderFilters>({ status: 'activos' })
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<Order[]>([])
-  const [error, setError] = useState<string | null>(null)
+  
 
   const effectiveFilters = useMemo<OrderFilters>(()=>{
     const f: OrderFilters = { ...filters }
@@ -31,7 +31,7 @@ export default function OrdersDashboard(){
   const reload = useCallback(async () => {
     if (!user) return
     setLoading(true)
-    setError(null)
+    
     try {
       const list = role === 'seller'
         ? await listOrdersForSeller(user.id, effectiveFilters)
@@ -41,13 +41,12 @@ export default function OrdersDashboard(){
         : list.filter(o => ['pendiente','en_proceso','enviado'].includes(o.status))
       setOrders(filtered)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error cargando pedidos'
-      setError(msg)
+      
     } finally {
       setLoading(false)
     }
   }, [user, role, effectiveFilters, tab])
-
+      
   useEffect(()=>{ reload() }, [reload])
 
   const onChangeStatus = async (order: Order, newStatus: Order['status']) => {
@@ -77,7 +76,7 @@ export default function OrdersDashboard(){
         </button>
       </div>
 
-      {error && <p className="mt-3 rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      
 
       <section className="mt-4 overflow-hidden rounded-lg border bg-white">
         <header className="flex items-center justify-between border-b px-4 py-2">
