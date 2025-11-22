@@ -112,7 +112,7 @@ export default function Products() {
                 <div className="absolute inset-0 animate-spin rounded-full border-4 border-green-600 border-t-transparent"></div>
               </div>
               <p className="mt-6 text-base font-medium text-gray-700">Cargando productos...</p>
-              <p className="mt-1 text-sm text-gray-500">Esto puede tardar unos segundos</p>
+              <p className="mt-1 text-sm text-gray-500">Esto puede tardar hasta unos minutos, por favor espere.</p>
             </div>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({length:6}).map((_,i)=> (

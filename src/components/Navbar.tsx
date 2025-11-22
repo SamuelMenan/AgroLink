@@ -9,11 +9,10 @@ const navItemClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function Navbar() {
   const { user, signOut } = useAuth()
-  const [cartCount, setCartCount] = useState<number>(() => getCartCount())
+  const [cartCount, setCartCount] = useState<number>(() => (typeof window !== 'undefined' && user ? getCartCount() : 0))
   useEffect(()=>{
-    const off = onCartChange(()=> setCartCount(getCartCount()))
-    // también actualizar al montar (por si cambió en otra vista)
-    setCartCount(getCartCount())
+    setCartCount(user ? getCartCount() : 0)
+    const off = onCartChange(()=> setCartCount(user ? getCartCount() : 0))
     return off
   }, [])
   const initials = (user?.full_name || user?.email || '')
@@ -40,12 +39,14 @@ export default function Navbar() {
               <NavLink to="/products" className={navItemClass}>
                 Productos
               </NavLink>
-              <NavLink to="/cart" className={(args)=> navItemClass(args) + ' relative'}>
-                Carrito
-                {cartCount > 0 && (
-                  <span className="absolute -right-2 -top-2 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{cartCount}</span>
-                )}
-              </NavLink>
+              {user && (
+                <NavLink to="/cart" className={(args)=> navItemClass(args) + ' relative'}>
+                  Carrito
+                  {cartCount > 0 && (
+                    <span className="absolute -right-2 -top-2 inline-flex min-h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{cartCount}</span>
+                  )}
+                </NavLink>
+              )}
             </nav>
           </div>
 

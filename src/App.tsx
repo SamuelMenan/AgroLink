@@ -65,9 +65,9 @@ function App() {
             <Route path="/dashboard/orders" element={<OrdersDashboard />} />
             <Route path="/dashboard/settings" element={<AccountPrivacy />} />
             <Route path="/dashboard/catalog" element={<CatalogManagement />} />
+            <Route path="/cart" element={<Cart />} />
           </Route>
           <Route path="/products" element={<Products />} />
-          <Route path="/cart" element={<Cart />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <SystemMonitor />

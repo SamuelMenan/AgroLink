@@ -61,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     backendSignOut()
     setUser(null)
+    try { localStorage.removeItem('agrolink_uid') } catch {}
   }
 
 /**
@@ -142,7 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail: AuthContextValue['signInWithEmail'] = async ({ email, password }) => {
     try {
       const resp = await signInEmail(email, password)
-      setUser(deriveUserFromTokens(resp))
+      const u = deriveUserFromTokens(resp)
+      setUser(u)
+      try { if (u?.id) localStorage.setItem('agrolink_uid', u.id) } catch {}
       return {}
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error inicio sesión'
@@ -177,7 +180,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isPhone = /^\+?\d{7,15}$/.test(normalized) || /^\d{7,15}$/.test(normalized.replace(/\s|-/g, ''))
     try {
       const resp = isPhone ? await signInPhone(normalized, password, captchaToken) : await signInEmail(normalized, password, captchaToken)
-      setUser(deriveUserFromTokens(resp))
+      const u = deriveUserFromTokens(resp)
+      setUser(u)
+      try { if (u?.id) localStorage.setItem('agrolink_uid', u.id) } catch {}
       return {}
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error inicio sesión'

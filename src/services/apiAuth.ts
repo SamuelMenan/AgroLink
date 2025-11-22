@@ -83,6 +83,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
   // Detectar sign-up para control de reintentos: permitimos reintento sólo en errores de infraestructura (502/503/504)
   const isSignUp = /\/sign-up$/.test(path)
   const maxRetries = isSignUp ? 2 : 2;
+  try { await warmupProxy() } catch {}
   let lastError: unknown = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -105,7 +106,7 @@ async function post(path: string, body: PostBody): Promise<BackendAuthResponse> 
           sameOrigin: (typeof window !== 'undefined') ? (new URL(BASE_URL).origin === window.location.origin) : true
         })
         
-        const shouldAttemptDirect = res.status === 405 || (typeof window !== 'undefined' ? (new URL(BASE_URL).origin === window.location.origin) : true)
+        const shouldAttemptDirect = res.status === 405 || res.status === 502 || (typeof window !== 'undefined' ? (new URL(BASE_URL).origin === window.location.origin) : true)
         
         if (shouldAttemptDirect) {
           try {

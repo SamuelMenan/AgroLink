@@ -8,7 +8,7 @@ interface RichTextEditorProps {
   className?: string
 }
 
-export default function RichTextEditor({ value, onChange, maxLength, className = '' }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, maxLength, className = '', placeholder }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const [isBold, setIsBold] = useState(false)
   const [isItalic, setIsItalic] = useState(false)
@@ -134,8 +134,13 @@ export default function RichTextEditor({ value, onChange, maxLength, className =
         dangerouslySetInnerHTML={{ __html: value }}
         style={{ 
           lineHeight: '1.5',
-          fontSize: '14px'
+          fontSize: '14px',
+          direction: 'ltr',
+          textAlign: 'left',
+          unicodeBidi: 'plaintext',
+          whiteSpace: 'pre-wrap'
         }}
+        aria-placeholder={placeholder || ''}
       />
       {maxLength && (
         <div className="p-2 text-xs text-gray-500 border-t border-gray-200 bg-gray-50">

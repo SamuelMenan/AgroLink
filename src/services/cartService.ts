@@ -7,11 +7,19 @@ export type CartItem = {
   quantity: number
 }
 
-const LS_KEY = 'agrolink_cart'
+const BASE_KEY = 'agrolink_cart'
+function key() {
+  try {
+    const uid = localStorage.getItem('agrolink_uid') || 'guest'
+    return `${BASE_KEY}::${uid}`
+  } catch {
+    return `${BASE_KEY}::guest`
+  }
+}
 
 function read(): CartItem[] {
   try {
-    const raw = localStorage.getItem(LS_KEY)
+    const raw = localStorage.getItem(key())
     return raw ? (JSON.parse(raw) as CartItem[]) : []
   } catch {
     return []
@@ -19,7 +27,7 @@ function read(): CartItem[] {
 }
 
 function write(items: CartItem[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(items))
+  localStorage.setItem(key(), JSON.stringify(items))
   // Notificar a la UI que cambió el carrito
   window.dispatchEvent(new CustomEvent('cart:updated'))
 }
