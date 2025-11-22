@@ -5,6 +5,7 @@ import { changeMyPassword, getMyProfile, saveMyProfile } from '../../services/pr
 import { DEPARTMENTS } from '../../services/locationService'
 import { ValidatedInput } from '../../hooks/useValidation'
 import { VALIDATION_RULES } from '../../utils/inputValidation'
+import { useTheme } from '../../hooks/useTheme'
 
 function useDebounced<T>(value: T, delay = 600): T {
   const [debounced, setDebounced] = useState(value)
@@ -17,6 +18,7 @@ function useDebounced<T>(value: T, delay = 600): T {
 
 export default function AccountPrivacy(){
   const { user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -42,7 +44,9 @@ export default function AccountPrivacy(){
       if (!user) return
       try {
         const p = await getMyProfile(user.id)
-        if (mounted) setProfile(p)
+        const nameFallback = (p.full_name && p.full_name.trim() && p.full_name !== 'Usuario') ? p.full_name : (user.full_name || '')
+        const patched = { ...p, full_name: nameFallback }
+        if (mounted) setProfile(patched)
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'No se pudo cargar el perfil'
         setError(msg)
@@ -156,7 +160,7 @@ export default function AccountPrivacy(){
       return
     }
     try {
-      await changeMyPassword(pwdNew)
+      await changeMyPassword(pwdNew, pwdCurrent)
       setPwdStatus('Contraseña actualizada. Si la sesión expira, vuelve a iniciar sesión.')
       setPwdCurrent(''); setPwdNew(''); setPwdConfirm('')
     } catch (e: unknown) {
@@ -176,20 +180,28 @@ export default function AccountPrivacy(){
           {!!savedLabel && <span className="text-sm text-gray-600">{savedLabel}</span>}
         </div>
 
-        <section className="p-6 md:p-8 space-y-5">
+        <section className="p-6 md:p-8 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Perfil</h2>
           </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm text-gray-600">Nombre</label>
-            <input value={profile?.full_name ?? ''} onChange={(e)=> onChange('full_name', e.target.value.replace(/^\s+/, ''))} className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20" />
+            <ValidatedInput
+              value={profile?.full_name ?? ''}
+              onChange={(v)=> onChange('full_name', v.replace(/^\s+/, ''))}
+              rule={VALIDATION_RULES.userName}
+              placeholder="Nombre"
+              className="mt-1 w-full rounded-lg border border-gray-300/90 bg-white/80 px-3 py-2 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+              showIcon={true}
+              maxLength={100}
+            />
             <VisibilitySelect label="Visibilidad del nombre" value={profile?.name_visibility ?? 'contacts'} onChange={(v)=> onChange('name_visibility', v)} />
           </div>
           
           <div className="sm:col-span-2">
             <label className="block text-sm text-gray-600">Dirección</label>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs text-gray-500">Departamento</label>
                 <select
@@ -237,9 +249,9 @@ export default function AccountPrivacy(){
           </div>
         </section>
 
-        <section className="border-t border-gray-100 p-6 md:p-8">
+        <section className="border-t border-gray-100 p-6 md:p-8 space-y-4">
           <h2 className="text-lg font-semibold">Seguridad</h2>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-gray-600">Contraseña actual</label>
               <div className="relative">
@@ -269,6 +281,7 @@ export default function AccountPrivacy(){
                   )}
                 </button>
               </div>
+              <PasswordStrength value={pwdNew} />
             </div>
             <div>
               <label className="block text-sm text-gray-600">Nueva contraseña</label>
@@ -336,6 +349,20 @@ export default function AccountPrivacy(){
           {pwdStatus && <span className="text-sm text-gray-600">{pwdStatus}</span>}
         </div>
         </section>
+
+        <section className="border-t border-gray-100 p-6 md:p-8 space-y-4">
+          <h2 className="text-lg font-semibold">Preferencias</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/80 px-4 py-3">
+              <span className="text-sm text-gray-700">Tema</span>
+              <button type="button" onClick={toggleTheme} className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200">{theme === 'dark' ? 'Oscuro' : 'Claro'}</button>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/80 px-4 py-3">
+              <span className="text-sm text-gray-700">Notificaciones</span>
+              <NotificationsToggle />
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   )
@@ -351,5 +378,38 @@ function VisibilitySelect({ label, value, onChange }: { label: string; value: Vi
         <option value="private">Privado</option>
       </select>
     </div>
+  )
+}
+
+function PasswordStrength({ value }: { value: string }){
+  const len = value.length
+  const hasLower = /[a-z]/.test(value)
+  const hasUpper = /[A-Z]/.test(value)
+  const hasNum = /[0-9]/.test(value)
+  const hasSym = /[^A-Za-z0-9]/.test(value)
+  let score = 0
+  if (len >= 8) score++
+  if (hasLower && hasUpper) score++
+  if (hasNum) score++
+  if (hasSym) score++
+  const label = score <= 1 ? 'Débil' : score === 2 ? 'Media' : score === 3 ? 'Buena' : 'Fuerte'
+  const color = score <= 1 ? 'text-red-600' : score === 2 ? 'text-yellow-600' : score === 3 ? 'text-green-600' : 'text-green-700'
+  return <p className={`mt-2 text-xs ${color}`}>Fortaleza: {label}</p>
+}
+
+function NotificationsToggle(){
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    const v = localStorage.getItem('notifications')
+    return v ? v === '1' : true
+  })
+  const toggle = () => {
+    const next = !enabled
+    setEnabled(next)
+    localStorage.setItem('notifications', next ? '1' : '0')
+  }
+  return (
+    <button type="button" onClick={toggle} className={`rounded-md px-3 py-1.5 text-sm font-medium ${enabled ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'} hover:opacity-90`}>
+      {enabled ? 'Activadas' : 'Desactivadas'}
+    </button>
   )
 }
