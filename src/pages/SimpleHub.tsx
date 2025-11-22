@@ -15,6 +15,7 @@ export default function SimpleHub() {
         <BigButton to="/dashboard/products" icon="inventory_2" title="Mis publicaciones" subtitle="Edita o elimina" />
         <BigButton to="/messages" icon="message" title="Mensajes" subtitle="Chatea con compradores y vendedores" />
         <BigButton to="/dashboard/orders" icon="list_alt" title="Pedidos" subtitle="Gestiona estados y descargas" />
+        <BigButton to="/dashboard/catalog" icon="library_books" title="Catálogo" subtitle="Sincroniza y mejora tus productos" />
         <BigButton to="/dashboard/settings" icon="manage_accounts" title="Configuración" subtitle="Perfil y privacidad" />
       </section>
 

@@ -1,9 +1,10 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Home() {
   const { user } = useAuth()
   const sellTo = user ? '/dashboard/products/new' : '/login?intent=publish&next=/dashboard/products/new'
+  if (user) return <Navigate to="/simple" replace />
   return (
     <main>
       {/* Hero */}
@@ -42,35 +43,7 @@ export default function Home() {
       </section>
 
       {/* Panel del usuario autenticado */}
-      {user && (
-        <section>
-          <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-bold text-green-700">Tu panel</h2>
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Link to="/dashboard/products/new" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-                <h3 className="font-semibold">Publicar productos</h3>
-                <p className="text-sm text-gray-600">Publica nuevos productos con fotos y precios.</p>
-              </Link>
-              <Link to="/dashboard/orders" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-                <h3 className="font-semibold">Pedidos</h3>
-                <p className="text-sm text-gray-600">Revisa pedidos y actualiza su estado.</p>
-              </Link>
-              <Link to="/dashboard/products" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-                <h3 className="font-semibold">Mis publicaciones</h3>
-                <p className="text-sm text-gray-600">Edita o elimina tus publicaciones.</p>
-              </Link>
-              <Link to="/dashboard/catalog" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-                <h3 className="font-semibold">Catálogo</h3>
-                <p className="text-sm text-gray-600">Sincroniza y mejora la información de todos tus productos.</p>
-              </Link>
-              <Link to="/dashboard/settings" className="rounded border p-4 transition hover:-translate-y-0.5 hover:shadow">
-                <h3 className="font-semibold">Configuración</h3>
-                <p className="text-sm text-gray-600">Perfil y privacidad de tu cuenta.</p>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      
     </main>
   )
 }

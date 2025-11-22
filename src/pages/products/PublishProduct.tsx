@@ -76,7 +76,6 @@ export default function PublishProduct() {
       ) : (
         <>
           <ProductForm title="Publicar producto" onSubmit={onSubmit} submitLabel="Publicar" />
-          <p className="mt-4 text-sm text-gray-600">Nota: asegúrate de que el backend tenga configurado almacenamiento de imágenes; de lo contrario las URLs no serán persistentes.</p>
         </>
       )}
     </main>
